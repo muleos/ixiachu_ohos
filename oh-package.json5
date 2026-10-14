@@ -1,0 +1,8 @@
+{
+  "modelVersion": "26.0.0",
+  "description": "VAE+ HarmonyOS 原生移植（登录、签到）",
+  "dependencies": {
+  },
+  "devDependencies": {
+  }
+}

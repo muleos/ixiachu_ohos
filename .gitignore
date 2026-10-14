@@ -1,0 +1,29 @@
+# HarmonyOS 构建产物
+entry/build/
+build/
+.hvigor/
+oh_modules/
+entry/oh_modules/
+node_modules/
+
+# 本地配置
+local.properties
+.idea/
+*.iml
+
+# 构建产物
+*.hap
+*.app
+
+# 签名材料
+*.cer
+*.p7b
+*.p12
+*.keystore
+
+# 日志
+*.log
+build.log
+
+# 过程文件
+.remote_head.txt

@@ -1,0 +1,8 @@
+{
+  "src": [
+    "pages/MainTab",
+    "pages/RecipeImport",
+    "pages/RecipeDetail",
+    "pages/ReceiptScan"
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "I下厨 —— 菜谱管理与点菜助手"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "I下厨主入口"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "I下厨"
+    }
+  ]
+}
