@@ -21,6 +21,8 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<boolean>('isDarkMode', false);
     AppStorage.setOrCreate<number>('statusBarHeight', 0);
     AppStorage.setOrCreate<number>('navBarHeight', 0);
+    AppStorage.setOrCreate<number>('dataRev', 0);
+    AppStorage.setOrCreate<number>('shoppingRev', 0);
     hilog.info(DOMAIN, TAG, 'onCreate');
   }
 

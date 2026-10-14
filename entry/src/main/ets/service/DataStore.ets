@@ -29,6 +29,15 @@ export class DataStore {
     // 版本号 +1：让订阅 dataRev 的页面在异步初始化完成后刷新一次
     DataStore.rev += 1;
     AppStorage.setOrCreate<number>('dataRev', DataStore.rev);
+    // 采购清单用专属键强广播（@StorageLink 直连，不依赖 dataRev 间接刷新）
+    DataStore.publishShopping();
+  }
+
+  /** 采购清单变化广播：OrderTab 生成 / ShoppingTab 勾选 / 清除已购 统一走这里 */
+  private static publishShopping(): void {
+    DataStore.rev += 1;
+    AppStorage.setOrCreate<number>('dataRev', DataStore.rev);
+    AppStorage.setOrCreate<number>('shoppingRev', DataStore.rev);
   }
 
   private static loadRecipes(): Recipe[] {
@@ -160,11 +169,13 @@ export class DataStore {
   static setShopping(list: ShoppingItem[]): void {
     DataStore.shopping = list;
     DataStore.persist(KEY_SHOPPING, list);
+    DataStore.publishShopping();
   }
 
   static clearCheckedShopping(): void {
     DataStore.shopping = DataStore.shopping.filter((s: ShoppingItem): boolean => !s.checked);
     DataStore.persist(KEY_SHOPPING, DataStore.shopping);
+    DataStore.publishShopping();
   }
 
   static getStock(): StockItem[] {

@@ -14,8 +14,9 @@ export const PRIMARY_DARK: string = '#F07B45';
 /**
  * HdsNavigation MINI 顶栏高度（vp）。
  * 沉浸式下顶栏浮于内容上层，页内首行需避让：statusBarHeight + NAV_TITLE_HEIGHT。
+ * 取 56 留足余量（MINI 顶栏实测 44~56vp，机型有差异）。
  */
-export const NAV_TITLE_HEIGHT: number = 48;
+export const NAV_TITLE_HEIGHT: number = 56;
 
 /** 玻璃 dock 白玻璃描边（浅深通用半透明） */
 export function glassBorder(): string {

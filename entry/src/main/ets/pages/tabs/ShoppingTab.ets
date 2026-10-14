@@ -7,7 +7,8 @@ import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
 export struct ShoppingTab {
   pageScroller: Scroller = new Scroller();
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
-  @StorageProp('dataRev') @Watch('reload') dataRev: number = 0;
+  /** 采购清单专属广播键：@StorageLink 强绑定，生成/勾选/清除都会立即触发 reload */
+  @StorageLink('shoppingRev') @Watch('reload') shoppingRev: number = 0;
   /** 列表用 @State 承载：非状态方法调用不会触发条件分支重渲染 */
   @State items: ShoppingItem[] = [];
 
@@ -80,7 +81,7 @@ export struct ShoppingTab {
               .borderRadius(14)
               .backgroundColor($r('app.color.card_background'))
             }
-          }, (item: ShoppingItem): string => `${item.name}_${item.checked}_${this.dataRev}`)
+          }, (item: ShoppingItem): string => `${item.name}_${item.checked}_${this.shoppingRev}`)
         }
         .layoutWeight(1)
         .width('100%')
