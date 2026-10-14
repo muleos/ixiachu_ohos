@@ -7,7 +7,17 @@ import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
 export struct ShoppingTab {
   pageScroller: Scroller = new Scroller();
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
-  @StorageProp('dataRev') dataRev: number = 0;
+  @StorageProp('dataRev') @Watch('reload') dataRev: number = 0;
+  /** 列表用 @State 承载：非状态方法调用不会触发条件分支重渲染 */
+  @State items: ShoppingItem[] = [];
+
+  aboutToAppear(): void {
+    this.reload();
+  }
+
+  private reload(): void {
+    this.items = DataStore.getShopping();
+  }
 
   build() {
     Column() {
@@ -24,7 +34,7 @@ export struct ShoppingTab {
       .width('100%')
       .padding({ left: 16, right: 16, top: this.statusBarHeight + NAV_TITLE_HEIGHT + 8, bottom: 12 })
 
-      if (DataStore.getShopping().length === 0) {
+      if (this.items.length === 0) {
         Column({ space: 10 }) {
           Text('暂无采购清单').fontSize(16).fontColor($r('app.color.text_secondary'))
           Text('在「点菜」生成菜单后，一键生成按人数折算的采购清单').fontSize(13).fontColor($r('app.color.text_tertiary'))
@@ -32,14 +42,14 @@ export struct ShoppingTab {
         .width('100%').padding({ top: 60 })
       } else {
         List({ scroller: this.pageScroller, space: 10 }) {
-          ForEach(DataStore.getShopping(), (item: ShoppingItem): void => {
+          ForEach(this.items, (item: ShoppingItem): void => {
             ListItem() {
               Row({ space: 12 }) {
                 Toggle({ type: ToggleType.Checkbox, isOn: item.checked })
                   .selectedColor($r('app.color.accent'))
                   .onChange((on: boolean): void => {
                     item.checked = on;
-                    DataStore.setShopping(DataStore.getShopping());
+                    DataStore.setShopping(this.items);
                   })
                 Column({ space: 3 }) {
                   Row({ space: 8 }) {

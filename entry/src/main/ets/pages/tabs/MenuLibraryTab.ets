@@ -8,14 +8,24 @@ import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
 export struct MenuLibraryTab {
   pageScroller: Scroller = new Scroller();
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
-  @StorageProp('dataRev') dataRev: number = 0;
+  @StorageProp('dataRev') @Watch('reload') dataRev: number = 0;
   @State keyword: string = '';
   @State category: string = '全部';
+  /** 菜谱列表用 @State 承载，dataRev 变化（种入/导入）后自动刷新 */
+  @State allRecipes: Recipe[] = [];
+
+  aboutToAppear(): void {
+    this.reload();
+  }
+
+  private reload(): void {
+    this.allRecipes = DataStore.getRecipes().slice();
+  }
 
   /** 分类筛选：全部 + 菜谱库中实际出现的分类 */
   private categories(): string[] {
     const set: string[] = ['全部'];
-    for (const r of DataStore.getRecipes()) {
+    for (const r of this.allRecipes) {
       if (r.category.length > 0 && set.indexOf(r.category) < 0) {
         set.push(r.category);
       }
@@ -168,9 +178,15 @@ export struct MenuLibraryTab {
   }
 
   private filtered(): Recipe[] {
-    let list: Recipe[] = DataStore.searchRecipes(this.keyword);
-    if (this.category !== '全部') {
-      list = list.filter((r: Recipe): boolean => r.category === this.category);
+    let list: Recipe[] = [];
+    for (const r of this.allRecipes) {
+      if (this.keyword.length > 0 && r.name.indexOf(this.keyword) < 0 && r.tags.join(',').indexOf(this.keyword) < 0) {
+        continue;
+      }
+      if (this.category !== '全部' && r.category !== this.category) {
+        continue;
+      }
+      list.push(r);
     }
     return list;
   }

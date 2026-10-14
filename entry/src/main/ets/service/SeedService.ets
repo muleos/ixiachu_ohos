@@ -31,23 +31,26 @@ interface SeedRecipe {
 }
 
 export class SeedService {
-  private static readonly SEEDED_KEY: string = 'seeded_v1';
+  /** 种子版本：菜谱库扩充后递增（v2 = 40 道），老用户升级后自动增量补种 */
+  private static readonly SEEDED_KEY: string = 'seeded_version';
+  private static readonly SEED_VERSION: string = 'v2';
 
   static async seedIfNeed(context: Context): Promise<void> {
-    if (DataStore.getSetting(SeedService.SEEDED_KEY) === '1') {
-      return;
-    }
-    if (DataStore.getRecipes().length > 0) {
-      DataStore.setSetting(SeedService.SEEDED_KEY, '1');
+    if (DataStore.getSetting(SeedService.SEEDED_KEY) === SeedService.SEED_VERSION) {
       return;
     }
     try {
       const raw: string = await SeedService.readRawFile(context, 'seed_recipes.json');
       const seeds: SeedRecipe[] = JSON.parse(raw) as SeedRecipe[];
+      const existing: string[] = DataStore.getRecipes().map((r: Recipe): string => r.name);
       for (const s of seeds) {
+        // 增量补种：同名菜谱跳过，不覆盖用户已有数据
+        if (existing.indexOf(s.name) >= 0) {
+          continue;
+        }
         DataStore.saveRecipe(SeedService.toRecipe(s));
       }
-      DataStore.setSetting(SeedService.SEEDED_KEY, '1');
+      DataStore.setSetting(SeedService.SEEDED_KEY, SeedService.SEED_VERSION);
     } catch (e) {
       // 种子失败不阻塞启动
     }

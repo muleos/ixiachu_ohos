@@ -1,6 +1,6 @@
 /** 功能二：点菜 —— 搜索 / 人数随机 / 需求推荐 / 一键生成采购清单 */
 import { promptAction } from '@kit.ArkUI';
-import { DailyMenu, Recipe } from '../../model/Models';
+import { DailyMenu, Recipe, ShoppingItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { MenuPlanner } from '../../service/MenuPlanner';
 import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
@@ -172,10 +172,15 @@ export struct OrderTab {
               .backgroundColor($r('app.color.accent_soft'))
               .fontColor($r('app.color.accent'))
               .onClick((): void => {
-                const list = MenuPlanner.buildShoppingList(this.menu as DailyMenu);
-                DataStore.setShopping(list);
-                DataStore.consumeStock((this.menu as DailyMenu).recipeIds);
-                promptAction.showToast({ message: '采购清单已生成，请到「采购」页查看' });
+                try {
+                  const menu: DailyMenu = this.menu as DailyMenu;
+                  const list: ShoppingItem[] = MenuPlanner.buildShoppingList(menu);
+                  DataStore.setShopping(list);
+                  DataStore.consumeStock(menu.recipeIds);
+                  promptAction.showToast({ message: `采购清单已生成（${list.length} 项），请到「采购」页查看` });
+                } catch (e) {
+                  promptAction.showToast({ message: `生成失败：${(e as Error).message}` });
+                }
               })
           }
           .width('100%').padding(16).borderRadius(16)
