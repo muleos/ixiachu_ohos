@@ -2,12 +2,22 @@
 import { router } from '@kit.ArkUI';
 import { Recipe, RecipeIngredient, RecipeStep } from '../model/Models';
 import { DataStore } from '../service/DataStore';
+import { queryStatusBarHeight } from '../utils/Theme';
 
 @Entry
 @Component
 struct RecipeDetail {
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
   @StorageProp('dataRev') dataRev: number = 0;
+  @State queriedBar: number = 0;
+
+  aboutToAppear(): void {
+    queryStatusBarHeight(getContext(this)).then((h: number): void => {
+      if (h > 0) {
+        this.queriedBar = h;
+      }
+    });
+  }
 
   build() {
     Column() {
@@ -32,8 +42,8 @@ struct RecipeDetail {
           })
       }
       .width('100%')
-      .height(44)
-      .padding({ left: 12, right: 20, top: Math.max(this.statusBarHeight, 36) })
+      .constraintSize({ minHeight: 44 })
+      .padding({ left: 12, right: 20, top: Math.max(Math.max(this.statusBarHeight, this.queriedBar), 36) })
 
       Scroll() {
         Column({ space: 16 }) {

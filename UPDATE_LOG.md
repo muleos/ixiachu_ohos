@@ -1,5 +1,20 @@
 # I下厨 更新日志
 
+## v1.2.3 (2026-10-15)
+
+### 修复
+- **小票识别入库页顶栏遮挡**（根因修复）：
+  - 顶栏 Row 误用固定 `height(44)`——ArkUI 高度含 padding，状态栏 padding 会把标题内容压进 44vp 盒子内；改为 `constraintSize({ minHeight: 44 })` 高度自适应；
+  - 页面挂载时不再只依赖 AppStorage 广播：新增 `queryStatusBarHeight` 直查当前窗口避让区（ getLastWindow + TYPE_SYSTEM），广播滞后 / 失败时自查兜底，取两者较大值，最低仍保 36vp。
+- **小票识别接入系统识别能力（Core Vision Kit 文字识别标准流程）**：
+  - 相册 URI 改为 `fileIo.open` → fd → `image.createImageSource(fd)` 打开（media 库 URI 直接创建 ImageSource 在部分机型会失败）；
+  - 识别前调用 `textRecognition.init()` 初始化引擎（进程内幂等，只初始化一次）；
+  - PixelMap / ImageSource / 文件句柄在 finally 中统一释放；
+  - 识别失败时 toast 直接展示系统返回的原始错误原因，便于定位。
+
+### 优化
+- 菜谱详情、导入菜谱两个二级页的顶栏避让与小票识别页同款加固（自查兜底 + 高度自适应），杜绝同类遮挡。
+
 ## v1.2.2 (2026-10-15)
 
 ### 修复

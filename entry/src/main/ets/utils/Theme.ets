@@ -38,6 +38,41 @@ export function accentColor(): string {
 }
 
 /**
+ * 页面挂载时直接查询当前窗口状态栏高度（vp），不依赖 AppStorage 广播。
+ * 广播可能在页面挂载前未发布或值滞后，二级页自查一次最可靠；查询失败返回 0。
+ */
+export async function queryStatusBarHeight(context: Context): Promise<number> {
+  try {
+    const win: window.Window = await window.getLastWindow(context);
+    const sysArea = win.getWindowAvoidArea(window.AvoidAreaType.TYPE_SYSTEM);
+    const px: number = sysArea.topRect.height;
+    if (px <= 0) {
+      return 0;
+    }
+    let vp: number = 0;
+    try {
+      vp = win.getUIContext().px2vp(px);
+    } catch (e) {
+      vp = 0;
+    }
+    if (vp <= 0) {
+      try {
+        vp = px / display.getDefaultDisplaySync().densityPixels;
+      } catch (e) {
+        vp = 0;
+      }
+    }
+    if (vp <= 0) {
+      vp = px / 3.3;
+    }
+    return vp;
+  } catch (e) {
+    hilog.error(DOMAIN, TAG, 'queryStatusBarHeight failed: %{public}s', (e as Error).message);
+    return 0;
+  }
+}
+
+/**
  * 在 Ability 启动与深浅色切换时调用：
  * 广播 isDarkMode / statusBarHeight / navBarHeight，供全应用 @StorageProp 订阅。
  */

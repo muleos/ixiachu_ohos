@@ -1,9 +1,9 @@
 /** 拍购物小票 → OCR 识别 → 解析食材入库（可编辑确认） */
-import { router } from '@kit.ArkUI';
-import { promptAction } from '@kit.ArkUI';
+import { router, promptAction } from '@kit.ArkUI';
 import { StockItem } from '../model/Models';
 import { DataStore } from '../service/DataStore';
 import { ReceiptParser } from '../service/ReceiptParser';
+import { queryStatusBarHeight } from '../utils/Theme';
 
 const SAMPLE_RECEIPT: string = `永辉超市 购物小票
 2026-10-15 08:32
@@ -17,9 +17,19 @@ const SAMPLE_RECEIPT: string = `永辉超市 购物小票
 @Component
 struct ReceiptScan {
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
+  /** 页面挂载时直接查窗口避让区得到的状态栏高度（广播滞后/失败时的自查兜底） */
+  @State queriedBar: number = 0;
   @State rawText: string = '';
   @State items: StockItem[] = [];
   @State scanning: boolean = false;
+
+  aboutToAppear(): void {
+    queryStatusBarHeight(getContext(this)).then((h: number): void => {
+      if (h > 0) {
+        this.queriedBar = h;
+      }
+    });
+  }
 
   build() {
     Column() {
@@ -36,8 +46,8 @@ struct ReceiptScan {
         Blank()
       }
       .width('100%')
-      .height(44)
-      .padding({ left: 12, right: 20, top: Math.max(this.statusBarHeight, 36) })
+      .constraintSize({ minHeight: 44 })
+      .padding({ left: 12, right: 20, top: Math.max(Math.max(this.statusBarHeight, this.queriedBar), 36) })
 
       Row({ space: 12 }) {
         Button(this.scanning ? '识别中…' : '拍照 / 选图识别')
@@ -129,7 +139,10 @@ struct ReceiptScan {
         this.applyText(text);
       }
     } catch (e) {
-      promptAction.showToast({ message: '识别失败，请检查相册权限或手动粘贴小票文本' });
+      const msg: string = (e as Error).message ?? '';
+      promptAction.showToast({
+        message: msg.length > 0 ? `识别失败：${msg}` : '识别失败，请检查相册权限或手动粘贴小票文本'
+      });
     }
     this.scanning = false;
   }

@@ -4,7 +4,7 @@
  * 再用规则解析「品名 + 数量/重量 + 单价/金额」形成采购入库清单。
  */
 import { image } from '@kit.ImageKit';
-import { picker } from '@kit.CoreFileKit';
+import { picker, fileIo } from '@kit.CoreFileKit';
 import textRecognition from '@hms.ai.ocr.textRecognition';
 import { lookupFood } from './NutritionDB';
 import { StockItem } from '../model/Models';
@@ -53,7 +53,14 @@ export class ReceiptParser {
     return items;
   }
 
-  /** 选一张小票照片并识别文本；失败返回空串 */
+  /** 系统文字识别引擎是否已初始化（幂等，进程内只 init 一次） */
+  private static ocrInited: boolean = false;
+
+  /**
+   * 选一张小票照片并用系统识别能力（Core Vision Kit 文字识别）提取文本。
+   * 文件统一走 fd 打开（media 库 URI 直接 createImageSource 可能失败）；
+   * 失败时抛出异常，由页面 toast 展示原始原因。
+   */
   static async scanReceipt(): Promise<string> {
     const photoPicker: picker.PhotoViewPicker = new picker.PhotoViewPicker();
     const result: picker.PhotoSelectResult = await photoPicker.select({
@@ -63,12 +70,31 @@ export class ReceiptParser {
     if (result.photoUris.length === 0) {
       return '';
     }
-    const fileSource = await image.createImageSource(result.photoUris[0]);
-    const pixelMap = await fileSource.createPixelMap();
-    const info: textRecognition.VisionInfo = { pixelMap: pixelMap };
-    const data: textRecognition.TextRecognitionResult = await textRecognition.recognizeText(info);
-    pixelMap.release();
-    fileSource.release();
-    return data.value;
+    const uri: string = result.photoUris[0];
+    const file: fileIo.File = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY);
+    let fileSource: image.ImageSource | null = null;
+    let pixelMap: image.PixelMap | null = null;
+    try {
+      fileSource = await image.createImageSource(file.fd);
+      pixelMap = await fileSource.createPixelMap();
+      if (!ReceiptParser.ocrInited) {
+        await textRecognition.init();
+        ReceiptParser.ocrInited = true;
+      }
+      const info: textRecognition.VisionInfo = { pixelMap: pixelMap };
+      const data: textRecognition.TextRecognitionResult = await textRecognition.recognizeText(info);
+      return data.value;
+    } finally {
+      if (pixelMap !== null) {
+        pixelMap.release();
+      }
+      if (fileSource !== null) {
+        fileSource.release();
+      }
+      try {
+        fileIo.closeSync(file);
+      } catch (e) {
+      }
+    }
   }
 }

@@ -7,6 +7,7 @@ import { router, promptAction } from '@kit.ArkUI';
 import { RecipeParser } from '../service/RecipeParser';
 import { DataStore } from '../service/DataStore';
 import { XiachufangApi } from '../service/XiachufangApi';
+import { queryStatusBarHeight } from '../utils/Theme';
 
 const SAMPLE: string = `番茄炒蛋（2人份）
 
@@ -31,6 +32,7 @@ const DEFAULT_API_BASE: string = 'http://127.0.0.1:5000';
 @Component
 struct RecipeImport {
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
+  @State queriedBar: number = 0;
   @State text: string = '';
   @State apiBase: string = '';
   @State recipeInput: string = '';
@@ -39,6 +41,11 @@ struct RecipeImport {
   aboutToAppear(): void {
     const saved: string = DataStore.getSetting(API_BASE_KEY);
     this.apiBase = saved.length > 0 ? saved : DEFAULT_API_BASE;
+    queryStatusBarHeight(getContext(this)).then((h: number): void => {
+      if (h > 0) {
+        this.queriedBar = h;
+      }
+    });
   }
 
   build() {
@@ -57,8 +64,8 @@ struct RecipeImport {
         Blank()
       }
       .width('100%')
-      .height(44)
-      .padding({ left: 12, right: 20, top: Math.max(this.statusBarHeight, 36) })
+      .constraintSize({ minHeight: 44 })
+      .padding({ left: 12, right: 20, top: Math.max(Math.max(this.statusBarHeight, this.queriedBar), 36) })
 
       Scroll() {
         Column({ space: 14 }) {
