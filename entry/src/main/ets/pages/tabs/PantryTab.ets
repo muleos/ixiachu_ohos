@@ -24,6 +24,18 @@ export struct PantryTab {
           .layoutWeight(1)
         Button() {
           Row({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(16).fontColor([$r('app.color.accent')])
+            Text('手动录入').fontSize(14).fontColor($r('app.color.accent'))
+          }
+        }
+        .backgroundColor($r('app.color.accent_soft'))
+        .height(36)
+        .borderRadius(18)
+        .onClick((): void => {
+          router.pushUrl({ url: 'pages/StockManual' });
+        })
+        Button() {
+          Row({ space: 6 }) {
             SymbolGlyph($r('sys.symbol.picture')).fontSize(16).fontColor([$r('app.color.accent')])
             Text('拍小票入库').fontSize(14).fontColor($r('app.color.accent'))
           }

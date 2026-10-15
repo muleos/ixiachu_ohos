@@ -152,6 +152,10 @@ export class MenuPlanner {
       const ratio: number = menu.people / Math.max(1, r.servings);
       for (const ing of r.ingredients) {
         const info: FoodInfo = lookupFood(ing.name) as FoodInfo;
+        // 调料/调味菜不进采购清单（家里常备，且按斤估价无意义）
+        if (info.category === '调料' || info.category === '调味菜') {
+          continue;
+        }
         let grams: number = ing.amount <= 0 ? ((info.category === '肉类' || info.category === '水产') ? 200 : 15) : ing.amount;
         grams = Math.round(grams * ratio);
         const key: string = ing.name;

@@ -60,6 +60,22 @@ export struct MenuLibraryTab {
 
         Button() {
           Row({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.picture'))
+              .fontSize(18)
+              .fontColor([$r('app.color.accent')])
+            Text('识别').fontSize(14).fontColor($r('app.color.accent'))
+          }
+        }
+        .backgroundColor($r('app.color.accent_soft'))
+        .height(40)
+        .borderRadius(20)
+        .margin({ left: 10 })
+        .onClick((): void => {
+          router.pushUrl({ url: 'pages/MenuScan' });
+        })
+
+        Button() {
+          Row({ space: 6 }) {
             SymbolGlyph($r('sys.symbol.plus_circle'))
               .fontSize(18)
               .fontColor([$r('app.color.accent')])

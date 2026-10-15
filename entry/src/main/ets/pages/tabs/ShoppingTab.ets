@@ -20,7 +20,9 @@ export struct ShoppingTab {
   }
 
   private reload(): void {
-    this.items = DataStore.getShopping();
+    // 调料/调味菜不进采购清单（存量清单也一并过滤）
+    this.items = DataStore.getShopping().filter((it: ShoppingItem): boolean =>
+      it.category !== '调料' && it.category !== '调味菜');
   }
 
   /** 价格来源说明：有云端同步时显示同步日期 */

@@ -3,6 +3,8 @@
     "pages/MainTab",
     "pages/RecipeImport",
     "pages/RecipeDetail",
-    "pages/ReceiptScan"
+    "pages/ReceiptScan",
+    "pages/StockManual",
+    "pages/MenuScan"
   ]
 }
