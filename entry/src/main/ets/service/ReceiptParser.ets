@@ -10,41 +10,104 @@ import { lookupFood } from './NutritionDB';
 import { StockItem } from '../model/Models';
 
 export class ReceiptParser {
+  /** 小票噪音行关键词：店头信息、金额栏头、结算/售后说明等，命中即整行跳过 */
+  private static readonly NOISE: RegExp =
+    /(凭本|小票|发票|退货|换货|超市|卖场|便利店|分店|总部|门店|收银|机号|会员|积分|电话|地址|欢迎|光临|合计|小计|实收|应收|找零|收款|支付|优惠|折扣|满减|抹零|单号|流水|日期|时间|单价|数量|金额|品名|条码|称重|促销|特惠|营业|编号|店名|本店|客服|热线|质监)/;
+
   /** 从小票文本解析库存条目 */
   static parseText(text: string): StockItem[] {
     const items: StockItem[] = [];
+    const seen: Set<string> = new Set<string>();
     const lines: string[] = text.split(/\r?\n/);
     for (const raw of lines) {
       const line: string = raw.trim();
       if (line.length < 2) {
         continue;
       }
-      // 常见小票行：西红柿 1.25kg 9.90 / 土豆 2斤 6.00 / 鸡蛋 1份 12.9
-      const m: RegExpMatchArray | null = line.match(
-        /([\u4e00-\u9fa5A-Za-z]{2,10})\s*(\d+(?:\.\d+)?)\s*(kg|KG|千克|g|克|斤|两|份|个|盒|袋|包)?/);
-      if (m === null) {
+      // 店头/栏头/结算说明等噪音行
+      if (ReceiptParser.NOISE.test(line)) {
         continue;
       }
-      const name: string = m[1];
-      let amount: number = parseFloat(m[2]);
-      const unit: string = m[3] ?? '份';
-      if (unit === 'kg' || unit === 'KG' || unit === '千克') {
-        amount = Math.round(amount * 1000);
-      } else if (unit === '斤') {
-        amount = Math.round(amount * 500);
-      } else if (unit === '两') {
-        amount = Math.round(amount * 50);
-      } else if (unit !== 'g' && unit !== '克') {
-        amount = Math.round(amount);
+      // 无数字的行（店名、栏头「单价 数量」等）不是食材行
+      if (!/\d/.test(line)) {
+        continue;
       }
+      // 品名 = 行首的中文（可含字母）连续串，必须含中文（排除 NO.0001、日期行等）
+      const nm: RegExpMatchArray | null = line.match(/^([\u4e00-\u9fa5][\u4e00-\u9fa5A-Za-z]{1,11})/);
+      if (nm === null) {
+        continue;
+      }
+      const name: string = nm[1];
+      if (ReceiptParser.NOISE.test(name)) {
+        continue;
+      }
+
+      let amount: number = 0;
+      let unit: string = '份';
+      // ① 带重量单位的数字：西红柿 1.25kg / 土豆 2斤 / 排骨 500g
+      const wm: RegExpMatchArray | null =
+        line.match(/(?<![A-Za-z0-9.])(\d+(?:\.\d+)?)\s*(kg|KG|Kg|千克|克|g|斤|两)(?![A-Za-z0-9])/);
+      if (wm !== null) {
+        const v: number = parseFloat(wm[1]);
+        const u: string = wm[2];
+        if (u === 'kg' || u === 'KG' || u === 'Kg' || u === '千克') {
+          amount = Math.round(v * 1000);
+        } else if (u === '斤') {
+          amount = Math.round(v * 500);
+        } else if (u === '两') {
+          amount = Math.round(v * 50);
+        } else {
+          amount = Math.round(v);
+        }
+        unit = '克';
+      } else {
+        // ② 计数单位：鸡蛋 2盒 / 啤酒 6瓶 / 鸡蛋 1份
+        const cm: RegExpMatchArray | null =
+          line.match(/(?<![A-Za-z0-9.])(\d+(?:\.\d+)?)\s*(个|盒|袋|包|瓶|罐|桶|把|根|只|条|块|颗|粒|支|枚|份)(?![\u4e00-\u9fa5A-Za-z0-9])/);
+        if (cm !== null) {
+          amount = Math.round(parseFloat(cm[1]));
+          unit = cm[2];
+        } else {
+          // ③ 裸数字（常见称重小票：散西红柿 1.256 9.96 12.51）
+          // 第一个数字取重量（小数按 kg，整数按件数），后面的多为单价/金额
+          const nums: string[] = line.match(/(?<![A-Za-z0-9.])\d+(?:\.\d+)?/g) ?? [];
+          if (nums.length === 0) {
+            continue;
+          }
+          const first: string = nums[0];
+          if (first.indexOf('.') >= 0) {
+            const kg: number = parseFloat(first);
+            if (kg <= 0 || kg > 50) {
+              continue;
+            }
+            amount = Math.round(kg * 1000);
+            unit = '克';
+          } else {
+            const n: number = parseInt(first, 10);
+            if (n <= 0 || n > 99) {
+              continue;
+            }
+            amount = n;
+            unit = '份';
+          }
+        }
+      }
+      if (amount <= 0) {
+        continue;
+      }
+      // 同名同量去重（OCR 重复行）
+      const key: string = `${name}_${unit}_${amount}`;
+      if (seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+
       const info = lookupFood(name);
       const it: StockItem = new StockItem();
       it.id = `s${Date.now()}_${items.length}`;
       it.name = name;
-      it.amount = (unit === 'kg' || unit === 'KG' || unit === '千克' || unit === '斤' || unit === '两' || unit === 'g' || unit === '克')
-        ? amount : 1;
-      it.unit = (unit === 'kg' || unit === 'KG' || unit === '千克' || unit === '斤' || unit === '两' || unit === 'g' || unit === '克')
-        ? '克' : unit;
+      it.amount = amount;
+      it.unit = unit;
       it.category = info !== null ? info.category : '其他';
       it.buyDate = Date.now();
       it.baseShelfDays = info !== null ? info.shelfDays : 7;
