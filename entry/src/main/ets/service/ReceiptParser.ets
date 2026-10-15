@@ -2,12 +2,15 @@
  * 购物小票识别：
  * 优先走系统视觉能力（CoreVisionKit 文字识别）提取小票文本；
  * 再用规则解析「品名 + 数量/重量 + 单价/金额」形成采购入库清单。
+ * 品名经别名表归一（番茄→西红柿），金额折算单价入库（元/kg 或 元/件）。
  */
 import { image } from '@kit.ImageKit';
 import { picker, fileIo } from '@kit.CoreFileKit';
+import { common, Want } from '@kit.AbilityKit';
 import textRecognition from '@hms.ai.ocr.textRecognition';
 import { lookupFood } from './NutritionDB';
 import { StockItem } from '../model/Models';
+import { DataStore } from './DataStore';
 
 export class ReceiptParser {
   /** 小票噪音行关键词：店头信息、金额栏头、结算/售后说明等，命中即整行跳过 */
@@ -74,6 +77,9 @@ export class ReceiptParser {
 
       let amount: number = 0;
       let unit: string = '份';
+      // 已命中的数量表达式/数字 token（金额解析前从行内剔除，避免金额与数量混淆）
+      let kgToken: string = '';
+      let countToken: string = '';
       // ① 带重量单位的数字：西红柿 1.25kg / 土豆 2斤 / 排骨 500g（OCR 丢空格时「1.25kg9.90」也要能命中）
       const wm: RegExpMatchArray | null =
         line.match(/(?<![A-Za-z0-9.])(\d+(?:\.\d+)?)\s*(kg|KG|Kg|千克|克|g|斤|两)(?![A-Za-z])/);
@@ -112,6 +118,7 @@ export class ReceiptParser {
               const v: number = parseFloat(n);
               if (v > 0 && v <= 50) {
                 kg = v;
+                kgToken = n;
                 break;
               }
             }
@@ -125,6 +132,7 @@ export class ReceiptParser {
                 const v: number = parseInt(n, 10);
                 if (v >= 1 && v <= 99) {
                   count = v;
+                  countToken = n;
                   break;
                 }
               }
@@ -139,6 +147,42 @@ export class ReceiptParser {
       if (amount <= 0) {
         continue;
       }
+
+      // ④ 金额/单价：剔除已匹配的数量部分后，剩余行里找 ¥x.xx / x.xx元 / 末位数字
+      let rem: string = line;
+      if (wm !== null) {
+        rem = rem.replace(wm[0], '');
+      } else if (xm !== null) {
+        rem = rem.replace(xm[0], '');
+      } else if (cm !== null) {
+        rem = rem.replace(cm[0], '');
+      } else if (kgToken.length > 0) {
+        rem = rem.replace(kgToken, '');
+      } else if (countToken.length > 0) {
+        rem = rem.replace(countToken, '');
+      }
+      let price: number = 0;
+      const pm: RegExpMatchArray | null = rem.match(/(?:¥|￥)\s*(\d+(?:\.\d+)?)/);
+      const pm2: RegExpMatchArray | null = pm !== null ? null : rem.match(/(\d+(?:\.\d+)?)\s*(?:元|块)/);
+      if (pm !== null) {
+        price = parseFloat(pm[1]);
+      } else if (pm2 !== null) {
+        price = parseFloat(pm2[1]);
+      } else {
+        const nums2: string[] = rem.match(/\d+(?:\.\d+)?/g) ?? [];
+        // 金额 = 末位 0.1≤x≤9999 的数字（条码大整数天然落在范围外）
+        for (let i = nums2.length - 1; i >= 0; i--) {
+          const v: number = parseFloat(nums2[i]);
+          if (v >= 0.1 && v <= 9999) {
+            price = v;
+            break;
+          }
+        }
+      }
+
+      // 品名归一（别名表：番茄→西红柿），归一后再查知识库
+      name = DataStore.normalizeName(name);
+
       // 同名同量去重（OCR 重复行）
       const key: string = `${name}_${unit}_${amount}`;
       if (seen.has(key)) {
@@ -155,6 +199,25 @@ export class ReceiptParser {
       it.category = info !== null ? info.category : '其他';
       it.buyDate = Date.now();
       it.baseShelfDays = info !== null ? info.shelfDays : 7;
+      // 单价折算：重量类元/千克，计数类元/件（异常值丢弃，确认页可见）
+      if (price > 0) {
+        it.lastPriceDate = ReceiptParser.todayStr();
+        if (unit === '克') {
+          const ppk: number = Math.round(price / (amount / 1000) * 100) / 100;
+          if (ppk >= 0.1 && ppk <= 9999) {
+            it.pricePerKg = ppk;
+          } else {
+            it.lastPriceDate = '';
+          }
+        } else {
+          const ppu: number = Math.round(price / amount * 100) / 100;
+          if (ppu >= 0.1 && ppu <= 9999) {
+            it.pricePerUnit = ppu;
+          } else {
+            it.lastPriceDate = '';
+          }
+        }
+      }
       items.push(it);
     }
     return items;
@@ -162,6 +225,13 @@ export class ReceiptParser {
 
   /** 系统文字识别引擎是否已初始化（幂等，进程内只 init 一次） */
   private static ocrInited: boolean = false;
+
+  static todayStr(): string {
+    const d: Date = new Date();
+    const m: string = String(d.getMonth() + 1).padStart(2, '0');
+    const day: string = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
 
   /**
    * 选一张小票照片并用系统识别能力（Core Vision Kit 文字识别）提取文本。
@@ -177,13 +247,69 @@ export class ReceiptParser {
     if (result.photoUris.length === 0) {
       return '';
     }
-    const uri: string = result.photoUris[0];
-    const file: fileIo.File = await fileIo.open(uri, fileIo.OpenMode.READ_ONLY);
+    const file: fileIo.File = await fileIo.open(result.photoUris[0], fileIo.OpenMode.READ_ONLY);
+    try {
+      return await ReceiptParser.recognizeFd(file.fd);
+    } finally {
+      try {
+        fileIo.closeSync(file);
+      } catch (e) {
+      }
+    }
+  }
+
+  /**
+   * 拉起系统相机拍小票（Want imageCapture，零权限）。
+   * 拍成返回照片路径，用户取消/失败返回空串。
+   */
+  static async captureReceipt(context: common.UIAbilityContext): Promise<string> {
+    const path: string = `${context.cacheDir}/receipt_${Date.now()}.jpg`;
+    const want: Want = {
+      action: 'ohos.want.action.imageCapture',
+      parameters: { outputPath: path }
+    };
+    const result: common.AbilityResult = await context.startAbilityForResult(want);
+    if (result.resultCode !== 0) {
+      return '';
+    }
+    try {
+      const st: fileIo.Stat = fileIo.statSync(path);
+      return st.size > 0 ? path : '';
+    } catch (e) {
+      return '';
+    }
+  }
+
+  /** 从本地照片文件识别文本（拍照产物），链路与相册一致 */
+  static async recognizeFromPath(path: string): Promise<string> {
+    const file: fileIo.File = fileIo.openSync(path, fileIo.OpenMode.READ_ONLY);
+    try {
+      return await ReceiptParser.recognizeFd(file.fd);
+    } finally {
+      try {
+        fileIo.closeSync(file);
+      } catch (e) {
+      }
+    }
+  }
+
+  /**
+   * fd → PixelMap →（超宽压缩到 1280 提速提准）→ OCR 文本。
+   * 失败抛异常由调用方处理；资源在 finally 中释放。
+   */
+  private static async recognizeFd(fd: number): Promise<string> {
     let fileSource: image.ImageSource | null = null;
     let pixelMap: image.PixelMap | null = null;
     try {
-      fileSource = await image.createImageSource(file.fd);
+      fileSource = await image.createImageSource(fd);
       pixelMap = await fileSource.createPixelMap();
+      // OCR 前压缩：相机原图动辄 3000+ 宽，等比缩到 1280 内（识别更稳更快）
+      const imgInfo: image.ImageInfo = pixelMap.getImageInfoSync();
+      const w: number = imgInfo.size.width;
+      if (w > 1280) {
+        const s: number = 1280 / w;
+        await pixelMap.scale(s, s);
+      }
       if (!ReceiptParser.ocrInited) {
         await textRecognition.init();
         ReceiptParser.ocrInited = true;
@@ -197,10 +323,6 @@ export class ReceiptParser {
       }
       if (fileSource !== null) {
         fileSource.release();
-      }
-      try {
-        fileIo.closeSync(file);
-      } catch (e) {
       }
     }
   }

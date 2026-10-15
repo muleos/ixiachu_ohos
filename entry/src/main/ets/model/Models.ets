@@ -111,6 +111,12 @@ export class StockItem {
   calibratedRatio: number = -1;
   /** 最近一次用户校准时间（毫秒），0 表示未校准过 */
   lastCalibrated: number = 0;
+  /** 小票识别单价（元/千克，仅重量类条目），0 表示未知 */
+  pricePerKg: number = 0;
+  /** 小票识别单价（元/件，仅计数类条目），0 表示未知 */
+  pricePerUnit: number = 0;
+  /** 单价采集日期（yyyy-MM-dd，空表示无价格） */
+  lastPriceDate: string = '';
 }
 
 /** 一次库存扣减记录（消耗日志） */

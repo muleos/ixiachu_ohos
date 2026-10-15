@@ -11,6 +11,36 @@ const KEY_SHOPPING: string = 'shopping_json';
 const KEY_STOCK: string = 'stock_json';
 const KEY_CONSUME: string = 'consume_json';
 
+/** 内置别名表：[标准名, 别名...]（小票 OCR 品名 / 菜谱食材名归一到标准名） */
+const BUILTIN_ALIASES: string[][] = [
+  ['西红柿', '番茄', '洋柿子'],
+  ['土豆', '马铃薯', '洋芋', '地蛋'],
+  ['圆白菜', '包菜', '卷心菜', '椰菜'],
+  ['花菜', '菜花', '花椰菜'],
+  ['鸡蛋', '鸡卵'],
+  ['青椒', '柿子椒', '甜椒', '菜椒'],
+  ['大白菜', '白菜'],
+  ['生菜', '叶用莴苣'],
+  ['五花肉', '肋条肉', '五花猪肉'],
+  ['猪肉', '瘦肉', '猪瘦肉'],
+  ['排骨', '猪排骨', '肋排'],
+  ['虾', '鲜虾', '大虾', '海虾', '基围虾'],
+  ['豆腐', '水豆腐', '北豆腐', '南豆腐'],
+  ['金针菇', '金菇'],
+  ['洋葱', '圆葱', '葱头'],
+  ['红薯', '地瓜', '番薯', '山芋'],
+  ['莲藕', '藕', '鲜藕'],
+  ['玉米', '苞米', '苞谷'],
+  ['黄瓜', '青瓜', '刺瓜'],
+  ['西兰花', '绿花菜', '青花菜'],
+  ['山药', '薯蓣'],
+  ['茄子', '紫茄'],
+  ['鸡腿', '鸡全腿', '琵琶腿']
+];
+
+/** 用户改名沉淀的别名（学习）：alias → 标准名 */
+const LEARNED_KEY: string = 'learned_alias_json';
+
 export class DataStore {
   private static store: preferences.Preferences | null = null;
   private static recipes: Recipe[] = [];
@@ -18,6 +48,8 @@ export class DataStore {
   private static shopping: ShoppingItem[] = [];
   private static stock: StockItem[] = [];
   private static consumeLog: ConsumeRecord[] = [];
+  /** 别名 → 标准名 映射（内置 + 用户学习沉淀合并） */
+  private static aliasMap: Map<string, string> = new Map<string, string>();
   /** 数据版本号：增删改后 +1，页面通过 @StorageProp 订阅刷新 */
   static rev: number = 0;
 
@@ -31,6 +63,7 @@ export class DataStore {
     DataStore.shopping = DataStore.loadShopping();
     DataStore.stock = DataStore.loadStock();
     DataStore.consumeLog = DataStore.loadConsume();
+    DataStore.loadAliases();
     DataStore.migrateIngredientNames();
     // 版本号 +1：让订阅 dataRev 的页面在异步初始化完成后刷新一次
     DataStore.rev += 1;
@@ -113,10 +146,19 @@ export class DataStore {
     try {
       const raw: string = (DataStore.store as preferences.Preferences).getSync(KEY_STOCK, '') as string;
       const list: StockItem[] = raw.length === 0 ? [] : JSON.parse(raw) as StockItem[];
-      // 存量数据补默认字段（旧版无 lastCalibrated）
+      // 存量数据补默认字段（旧版无 lastCalibrated / 价格三字段）
       for (const s of list) {
         if (s.lastCalibrated === undefined || s.lastCalibrated === null) {
           s.lastCalibrated = 0;
+        }
+        if (s.pricePerKg === undefined || s.pricePerKg === null) {
+          s.pricePerKg = 0;
+        }
+        if (s.pricePerUnit === undefined || s.pricePerUnit === null) {
+          s.pricePerUnit = 0;
+        }
+        if (s.lastPriceDate === undefined || s.lastPriceDate === null) {
+          s.lastPriceDate = '';
         }
       }
       return list;
@@ -131,6 +173,54 @@ export class DataStore {
       return raw.length === 0 ? [] : JSON.parse(raw) as ConsumeRecord[];
     } catch (e) {
       return [];
+    }
+  }
+
+  /** 构建别名映射：内置表 + 用户学习沉淀（持久化在 LEARNED_KEY） */
+  private static loadAliases(): void {
+    DataStore.aliasMap = new Map<string, string>();
+    for (const group of BUILTIN_ALIASES) {
+      const std: string = group[0];
+      for (let i = 1; i < group.length; i++) {
+        DataStore.aliasMap.set(group[i], std);
+      }
+    }
+    try {
+      const raw: string = (DataStore.store as preferences.Preferences).getSync(LEARNED_KEY, '') as string;
+      if (raw.length > 0) {
+        const learned: Map<string, string> = JSON.parse(raw) as Map<string, string>;
+        learned.forEach((std: string, alias: string): void => {
+          DataStore.aliasMap.set(alias, std);
+        });
+      }
+    } catch (e) {
+      // 学习表损坏时丢弃，仅用内置表
+    }
+  }
+
+  /** 品名归一：别名表命中返回标准名，否则原样返回 */
+  static normalizeName(name: string): string {
+    const std: string | undefined = DataStore.aliasMap.get(name);
+    return std === undefined ? name : std;
+  }
+
+  /**
+   * 改名沉淀：用户在确认页把识别名 A 改成 B 时调用 learnAlias(B, A)——
+   * 以后 OCR/解析再遇到 A 自动归一到 B。A===B 或 B 为空时忽略。
+   */
+  static learnAlias(std: string, alias: string): void {
+    if (std.length === 0 || alias.length === 0 || std === alias) {
+      return;
+    }
+    // 内置组内出现该别名时会被内置表覆盖，学习表优先级更高（后 set）
+    DataStore.aliasMap.set(alias, std);
+    try {
+      const raw: string = (DataStore.store as preferences.Preferences).getSync(LEARNED_KEY, '') as string;
+      const learned: Map<string, string> = raw.length > 0 ? JSON.parse(raw) as Map<string, string> : new Map<string, string>();
+      learned.set(alias, std);
+      DataStore.persist(LEARNED_KEY, learned);
+    } catch (e) {
+      // 持久化失败不影响本次会话内归一
     }
   }
 
@@ -252,6 +342,16 @@ export class DataStore {
         if (ex.name === it.name) {
           ex.amount += it.amount;
           ex.buyDate = Math.max(ex.buyDate, it.buyDate);
+          // 价格以最新一次采购为准
+          if (it.pricePerKg > 0) {
+            ex.pricePerKg = it.pricePerKg;
+          }
+          if (it.pricePerUnit > 0) {
+            ex.pricePerUnit = it.pricePerUnit;
+          }
+          if (it.lastPriceDate.length > 0) {
+            ex.lastPriceDate = it.lastPriceDate;
+          }
           merged = true;
           break;
         }

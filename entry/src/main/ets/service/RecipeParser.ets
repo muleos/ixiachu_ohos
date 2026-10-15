@@ -7,6 +7,7 @@
  */
 import { FoodInfo, lookupFood } from './NutritionDB';
 import { NutritionEstimate, Recipe, RecipeIngredient, RecipeStep } from '../model/Models';
+import { DataStore } from './DataStore';
 
 const SEC_HEAD_ING: RegExp = /(食材|用料|材料|原料)[：:]?/;
 const SEC_HEAD_STEP: RegExp = /(做法|步骤|烹饪方法|制作过程)[：:]?/;
@@ -35,6 +36,8 @@ function parseIngredientLine(line: string): RecipeIngredient | null {
 }
 
 function normalize(name: string, amount: number, unit: string): RecipeIngredient {
+  // 食材名归一：与小票识别共用别名表（番茄→西红柿），菜谱/库存/采购口径一致
+  const std: string = DataStore.normalizeName(name);
   let grams: number = amount;
   const u: string = unit;
   if (u === '千克' || u === 'kg' || u === '公斤') {
@@ -48,7 +51,7 @@ function normalize(name: string, amount: number, unit: string): RecipeIngredient
   } else if (u === 'g' || u === 'G' || u === '克') {
     grams = amount;
   }
-  return new RecipeIngredient(name, grams, u, `${name} ${amount}${u}`);
+  return new RecipeIngredient(std, grams, u, `${name} ${amount}${u}`);
 }
 
 export class RecipeParser {
