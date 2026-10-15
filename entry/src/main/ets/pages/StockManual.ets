@@ -15,6 +15,7 @@ struct StockManual {
   @State name: string = '';
   @State amount: string = '';
   @State unit: string = '克';
+  @State storage: string = '冷藏';
 
   aboutToAppear(): void {
     queryStatusBarHeight(getContext(this)).then((h: number): void => {
@@ -96,6 +97,19 @@ struct StockManual {
               }, (u: string): string => u)
             }
             .width('100%')
+            Text('储存状态').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+              .width('100%').margin({ top: 4 })
+            Row({ space: 8 }) {
+              ForEach(['常温', '冷藏', '冷冻'], (st: string): void => {
+                Button(st).fontSize(13).height(34).borderRadius(17).layoutWeight(1)
+                  .fontColor(this.storage === st ? Color.White : $r('app.color.text_secondary'))
+                  .backgroundColor(this.storage === st ? $r('app.color.accent') : $r('app.color.page_background'))
+                  .onClick((): void => {
+                    this.storage = st;
+                  })
+              }, (st: string): string => st)
+            }
+            .width('100%')
           }
           .width('100%').padding(16).borderRadius(16)
           .backgroundColor($r('app.color.card_background'))
@@ -141,6 +155,7 @@ struct StockManual {
     it.category = info.category;
     it.buyDate = Date.now();
     it.baseShelfDays = info.shelfDays;
+    it.storage = this.storage;
     DataStore.addStock([it]);
     promptAction.showToast({ message: `已入库：${n}` });
     router.back();

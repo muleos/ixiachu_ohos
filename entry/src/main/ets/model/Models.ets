@@ -117,6 +117,8 @@ export class StockItem {
   pricePerUnit: number = 0;
   /** 单价采集日期（yyyy-MM-dd，空表示无价格） */
   lastPriceDate: string = '';
+  /** 储存状态：常温 / 冷藏（默认）/ 冷冻 */
+  storage: string = '冷藏';
 }
 
 /** 一次库存扣减记录（消耗日志） */

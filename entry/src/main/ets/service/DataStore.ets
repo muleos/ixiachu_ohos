@@ -176,6 +176,9 @@ export class DataStore {
         if (s.lastPriceDate === undefined || s.lastPriceDate === null) {
           s.lastPriceDate = '';
         }
+        if (s.storage === undefined || s.storage === null || s.storage.length === 0) {
+          s.storage = '冷藏';
+        }
       }
       return list;
     } catch (e) {
@@ -561,13 +564,16 @@ export class DataStore {
     }
   }
 
-  /** 校准库存数量（用户手动修正）；量到 0 视为用完移除 */
-  static updateStockAmount(id: string, amount: number): void {
+  /** 校准库存数量与储存状态（用户手动修正）；量到 0 视为用完移除 */
+  static updateStockAmount(id: string, amount: number, storage: string): void {
     for (const s of DataStore.stock) {
       if (s.id === id) {
         s.amount = Math.max(0, amount);
         s.calibratedRatio = 1;
         s.lastCalibrated = Date.now();
+        if (storage === '常温' || storage === '冷藏' || storage === '冷冻') {
+          s.storage = storage;
+        }
         break;
       }
     }
