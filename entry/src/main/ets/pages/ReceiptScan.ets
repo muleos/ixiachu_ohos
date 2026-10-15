@@ -150,5 +150,8 @@ struct ReceiptScan {
   private applyText(text: string): void {
     this.rawText = text;
     this.items = ReceiptParser.parseText(text);
+    if (this.items.length === 0 && text.trim().length > 0) {
+      promptAction.showToast({ message: '未能从文本中解析出食材行，可手动删改文本（保留「品名 数量 价格」行）后重试' });
+    }
   }
 }
