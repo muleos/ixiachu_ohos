@@ -176,7 +176,8 @@ struct ReceiptScan {
             return;
           }
           DataStore.addStock(this.items);
-          promptAction.showToast({ message: `已入库 ${this.items.length} 项食材` });
+          DataStore.addLocalPrices(this.items);
+          promptAction.showToast({ message: `已入库 ${this.items.length} 项食材（单价已计入本地菜价参考）` });
           router.back();
         })
     }

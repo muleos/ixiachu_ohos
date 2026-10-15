@@ -25,12 +25,14 @@ export struct ShoppingTab {
       it.category !== '调料' && it.category !== '调味菜');
   }
 
-  /** 价格来源说明：有云端同步时显示同步日期 */
+  /** 价格来源说明：本地小票实付价优先展示，其次云端同步价，最后静态基准价 */
   private priceHint(): string {
-    if (this.priceSyncDate.length > 0) {
-      return `菜价参考：惠友到家（${this.priceSyncDate} 同步）`;
+    const localCount: number = DataStore.localPriceCount();
+    const cloud: string = this.priceSyncDate.length > 0 ? `惠友到家（${this.priceSyncDate} 同步）` : '惠友超市 / 网络公开价';
+    if (localCount > 0) {
+      return `菜价参考：本地小票实付价 ${localCount} 项优先，其余按 ${cloud}（±15%）`;
     }
-    return '菜价参考：惠友超市 / 网络公开价（±15%）';
+    return `菜价参考：${cloud}（±15%）`;
   }
 
   /** 数量展示：≥250g 按千克（2 位小数），其余按克/原单位 */

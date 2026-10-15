@@ -41,6 +41,19 @@ const BUILTIN_ALIASES: string[][] = [
 /** 用户改名沉淀的别名（学习）：alias → 标准名 */
 const LEARNED_KEY: string = 'learned_alias_json';
 
+/** 本地小票真实价（元/千克）：品名 → 采集记录（30 天内，中位数取价） */
+const KEY_LOCAL_PRICES: string = 'local_prices_json';
+const LOCAL_PRICE_TTL_DAYS: number = 30;
+const LOCAL_PRICE_MAX_PER_NAME: number = 20;
+
+/** 单条本地价采集记录 */
+export class LocalPricePoint {
+  /** 元/千克 */
+  p: number = 0;
+  /** 采集日期 yyyy-MM-dd */
+  d: string = '';
+}
+
 export class DataStore {
   private static store: preferences.Preferences | null = null;
   private static recipes: Recipe[] = [];
@@ -50,6 +63,8 @@ export class DataStore {
   private static consumeLog: ConsumeRecord[] = [];
   /** 别名 → 标准名 映射（内置 + 用户学习沉淀合并） */
   private static aliasMap: Map<string, string> = new Map<string, string>();
+  /** 本地小票真实价：品名 → 采集记录（最新在前） */
+  private static localPrices: Map<string, LocalPricePoint[]> = new Map<string, LocalPricePoint[]>();
   /** 数据版本号：增删改后 +1，页面通过 @StorageProp 订阅刷新 */
   static rev: number = 0;
 
@@ -64,6 +79,7 @@ export class DataStore {
     DataStore.stock = DataStore.loadStock();
     DataStore.consumeLog = DataStore.loadConsume();
     DataStore.loadAliases();
+    DataStore.loadLocalPrices();
     DataStore.migrateIngredientNames();
     // 版本号 +1：让订阅 dataRev 的页面在异步初始化完成后刷新一次
     DataStore.rev += 1;
@@ -222,6 +238,106 @@ export class DataStore {
     } catch (e) {
       // 持久化失败不影响本次会话内归一
     }
+  }
+
+  /** 载入本地小票价库并清理超期记录 */
+  private static loadLocalPrices(): void {
+    DataStore.localPrices = new Map<string, LocalPricePoint[]>();
+    try {
+      const raw: string = (DataStore.store as preferences.Preferences).getSync(KEY_LOCAL_PRICES, '') as string;
+      if (raw.length === 0) {
+        return;
+      }
+      const obj: Record<string, LocalPricePoint[]> = JSON.parse(raw) as Record<string, LocalPricePoint[]>;
+      const cutoff: string = DataStore.dateBefore(LOCAL_PRICE_TTL_DAYS);
+      for (const name of Object.keys(obj)) {
+        const list: LocalPricePoint[] = (obj[name] ?? []).filter((p: LocalPricePoint): boolean =>
+          p.p > 0 && p.d >= cutoff);
+        if (list.length > 0) {
+          DataStore.localPrices.set(name, list);
+        }
+      }
+    } catch (e) {
+      // 价库损坏时丢弃，回退知识库基准价
+    }
+  }
+
+  /** n 天前的日期串（yyyy-MM-dd） */
+  private static dateBefore(days: number): string {
+    const d: Date = new Date(Date.now() - days * 86400000);
+    const m: string = String(d.getMonth() + 1).padStart(2, '0');
+    const day: string = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${m}-${day}`;
+  }
+
+  private static persistLocalPrices(): void {
+    const obj: Record<string, LocalPricePoint[]> = {};
+    DataStore.localPrices.forEach((list: LocalPricePoint[], name: string): void => {
+      obj[name] = list;
+    });
+    DataStore.persist(KEY_LOCAL_PRICES, obj);
+  }
+
+  /**
+   * 小票确认入库时采集真实菜价：仅重量类条目（元/kg），同名同价去重，
+   * 每名留 20 条、超 30 天自动清理。
+   */
+  static addLocalPrices(items: StockItem[]): void {
+    const today: string = DataStore.dateBefore(0);
+    let changed: boolean = false;
+    for (const it of items) {
+      if (it.pricePerKg <= 0) {
+        continue;
+      }
+      const list: LocalPricePoint[] = DataStore.localPrices.get(it.name) ?? [];
+      // 同日同价去重（重复扫同一张小票不膨胀）
+      if (list.some((p: LocalPricePoint): boolean => p.d === today && Math.abs(p.p - it.pricePerKg) < 0.01)) {
+        continue;
+      }
+      const point: LocalPricePoint = new LocalPricePoint();
+      point.p = it.pricePerKg;
+      point.d = it.lastPriceDate.length > 0 ? it.lastPriceDate : today;
+      list.unshift(point);
+      if (list.length > LOCAL_PRICE_MAX_PER_NAME) {
+        list.length = LOCAL_PRICE_MAX_PER_NAME;
+      }
+      DataStore.localPrices.set(it.name, list);
+      changed = true;
+    }
+    if (changed) {
+      DataStore.persistLocalPrices();
+    }
+  }
+
+  /** 本地价条数（有真实价的品名数，供采购页展示来源） */
+  static localPriceCount(): number {
+    return DataStore.localPrices.size;
+  }
+
+  /**
+   * 统一定价入口（元/千克）：本地小票真实价（30 天中位数）优先，
+   * 无本地价回退知识库基准价（斤价 ×2，含云端同步覆盖）。
+   */
+  static pricePerKg(name: string): number {
+    const list: LocalPricePoint[] | undefined = DataStore.localPrices.get(name);
+    if (list !== undefined && list.length > 0) {
+      const sorted: number[] = list.map((p: LocalPricePoint): number => p.p).sort((a: number, b: number): number => a - b);
+      const mid: number = Math.floor(sorted.length / 2);
+      const med: number = sorted.length % 2 === 1
+        ? sorted[mid]
+        : (sorted[mid - 1] + sorted[mid]) / 2;
+      if (med > 0) {
+        return Math.round(med * 100) / 100;
+      }
+    }
+    const info = lookupFood(name);
+    return info !== null ? info.pricePerJin * 2 : 0;
+  }
+
+  /** 某品名是否有本地真实价（采购页标记用） */
+  static hasLocalPrice(name: string): boolean {
+    const list: LocalPricePoint[] | undefined = DataStore.localPrices.get(name);
+    return list !== undefined && list.length > 0;
   }
 
   private static persist(key: string, value: object): void {
