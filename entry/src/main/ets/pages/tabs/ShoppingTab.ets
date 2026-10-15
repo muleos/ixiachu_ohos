@@ -11,13 +11,24 @@ export struct ShoppingTab {
   @StorageLink('shoppingRev') @Watch('reload') shoppingRev: number = 0;
   /** 列表用 @State 承载：非状态方法调用不会触发条件分支重渲染 */
   @State items: ShoppingItem[] = [];
+  /** 云端菜价最近同步日期（空 = 尚未同步过，用内置基准价） */
+  @State priceSyncDate: string = '';
 
   aboutToAppear(): void {
     this.reload();
+    this.priceSyncDate = DataStore.getSetting('price_last_sync');
   }
 
   private reload(): void {
     this.items = DataStore.getShopping();
+  }
+
+  /** 价格来源说明：有云端同步时显示同步日期 */
+  private priceHint(): string {
+    if (this.priceSyncDate.length > 0) {
+      return `菜价参考：惠友到家（${this.priceSyncDate} 同步）`;
+    }
+    return '菜价参考：惠友超市 / 网络公开价（±15%）';
   }
 
   /** 数量展示：≥250g 按千克（2 位小数），其余按克/原单位 */
@@ -31,7 +42,7 @@ export struct ShoppingTab {
   build() {
     Column() {
       Row() {
-        Text('菜价参考：惠友超市 / 网络公开价（±15%）')
+        Text(this.priceHint())
           .fontSize(12).fontColor($r('app.color.text_tertiary'))
           .layoutWeight(1)
         Text('清除已购')

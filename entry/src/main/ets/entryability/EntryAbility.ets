@@ -8,6 +8,7 @@ import { window } from '@kit.ArkUI';
 import { KeyboardAvoidMode } from '@ohos.arkui.UIContext';
 import { applyTheme, publishInsets } from '../utils/Theme';
 import { SeedService } from '../service/SeedService';
+import { PriceSync } from '../service/PriceSync';
 
 const DOMAIN: number = 0x1C8;
 const TAG: string = 'EntryAbility';
@@ -59,6 +60,9 @@ export default class EntryAbility extends UIAbility {
     this.syncTheme();
     // 首启种入「下厨房精选」菜谱（异步，不阻塞首帧）
     SeedService.seedIfNeed(this.context);
+    // 启动静默同步云端菜价（惠友到家数据 → GitHub prices 分支），失败不影响使用
+    PriceSync.sync().catch((): void => {
+    });
   }
 
   private syncTheme(): void {

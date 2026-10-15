@@ -116,3 +116,58 @@ export function seasonalVeggies(month: number): string[] {
   }
   return ['南瓜', '冬瓜', '莲藕', '山药', '白菜', '萝卜'];
 }
+
+/** 云端菜价文件结构：{ updated: "2026-10-15", source: "惠友到家", prices: { "五花肉": 17.8, ... } }（元/斤） */
+interface PriceFile {
+  updated: string;
+  source: string;
+  prices: Record<string, number>;
+}
+
+/**
+ * 应用云端菜价覆盖：直接改写知识库内 FoodInfo 的基准价，
+ * 所有 lookupFood 调用方（点菜预算 / 采购估价）自动生效。
+ * 返回成功匹配并覆盖的条数。
+ */
+export function applyPriceOverrides(json: string): number {
+  let applied: number = 0;
+  try {
+    const file: PriceFile = JSON.parse(json) as PriceFile;
+    if (file.prices === undefined || file.prices === null) {
+      return 0;
+    }
+    const keys: string[] = Array.from(DB.keys());
+    const names: string[] = Object.keys(file.prices);
+    for (const name of names) {
+      const ppj: number = file.prices[name];
+      if (ppj <= 0 || ppj > 999) {
+        continue;
+      }
+      // 精确命中 → 直接覆盖；否则按包含关系匹配别名（「西红柿」↔「番茄」等共用实例）
+      const direct: FoodInfo | undefined = DB.get(name);
+      if (direct !== undefined) {
+        direct.pricePerJin = ppj;
+        applied++;
+        continue;
+      }
+      let matched: boolean = false;
+      for (const k of keys) {
+        if (k.length >= 2 && (name.indexOf(k) >= 0 || k.indexOf(name) >= 0)) {
+          const info: FoodInfo | undefined = DB.get(k);
+          if (info !== undefined) {
+            info.pricePerJin = ppj;
+            applied++;
+            matched = true;
+          }
+          break;
+        }
+      }
+      if (matched) {
+        continue;
+      }
+    }
+  } catch (e) {
+    return applied;
+  }
+  return applied;
+}
