@@ -2,8 +2,8 @@
   "app": {
     "bundleName": "com.hmos.ixiachu",
     "vendor": "ixiachu",
-    "versionCode": 103,
-    "versionName": "1.2.1",
+    "versionCode": 104,
+    "versionName": "1.2.2",
     "icon": "$media:app_icon",
     "label": "$string:app_name",
     "minAPIVersion": 23,

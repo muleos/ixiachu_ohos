@@ -86,7 +86,9 @@ export class ShoppingItem {
   amount: number = 0;
   unit: string = '';
   category: string = '';
-  /** 参考价（元，按所需量估算） */
+  /** 单价参考（元/千克，来源：超市及网络公开菜价） */
+  pricePerKg: number = 0;
+  /** 预计花费区间（元，按所需量 ±15%） */
   priceLow: number = 0;
   priceHigh: number = 0;
   checked: boolean = false;

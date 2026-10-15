@@ -2,7 +2,7 @@
 import { router } from '@kit.ArkUI';
 import { Recipe } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
-import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
+import { topAvoid } from '../../utils/Theme';
 
 @Component
 export struct MenuLibraryTab {
@@ -75,7 +75,7 @@ export struct MenuLibraryTab {
         })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: this.statusBarHeight + NAV_TITLE_HEIGHT + 8, bottom: 12 })
+      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 12 })
 
       // 分类筛选 chips
       Scroll() {

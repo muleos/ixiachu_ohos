@@ -170,12 +170,15 @@ export class MenuPlanner {
     const list: ShoppingItem[] = Array.from(map.values());
     for (const it of list) {
       const info: FoodInfo = lookupFood(it.name) as FoodInfo;
-      const base: number = info.pricePerJin * it.amount / 500;
-      it.priceLow = Math.round(base * 0.85 * 10) / 10;
-      it.priceHigh = Math.round(base * 1.15 * 10) / 10;
+      // 单价（元/千克）与预计花费（按所需量 ±15%，保留 1 位小数）
+      it.pricePerKg = Math.round(info.pricePerJin * 2 * 10) / 10;
+      const est: number = info.pricePerJin * it.amount / 500;
+      it.priceLow = Math.max(0.5, Math.round(est * 0.85 * 10) / 10);
+      it.priceHigh = Math.max(0.8, Math.round(est * 1.15 * 10) / 10);
       if (it.amount <= 0) {
         it.amount = 1;
         it.unit = '份';
+        it.pricePerKg = 0;
         it.priceLow = 2;
         it.priceHigh = 5;
       }

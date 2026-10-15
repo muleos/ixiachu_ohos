@@ -37,7 +37,7 @@ struct ReceiptScan {
       }
       .width('100%')
       .height(44)
-      .padding({ left: 12, right: 20, top: this.statusBarHeight })
+      .padding({ left: 12, right: 20, top: Math.max(this.statusBarHeight, 36) })
 
       Row({ space: 12 }) {
         Button(this.scanning ? '识别中…' : '拍照 / 选图识别')

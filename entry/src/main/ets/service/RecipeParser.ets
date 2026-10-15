@@ -17,13 +17,13 @@ function parseIngredientLine(line: string): RecipeIngredient | null {
   if (cleaned.length === 0) {
     return null;
   }
-  // 匹配：名称 前置，数量单位在后（支持 300g / 300克 / 2个 / 半斤 / 适量 / 1勺）
+  // 匹配：名称 前置，数量单位在后（支持 300g / 300克 / 2个 / 半斤 / 适量 / 1勺）；{1,10} 允许盐/醋/糖等单字名
   const m: RegExpMatchArray | null = cleaned.match(
-    /^([\u4e00-\u9fa5A-Za-z]{2,10})\s*(\d+(?:\.\d+)?)?\s*(克|g|G|千克|kg|公斤|斤|两|毫升|ml|ML|L|升|个|只|根|条|把|颗|瓣|片|块|勺|汤匙|茶匙|包|盒|袋|张|朵)?\s*(适量|少许)?$/);
+    /^([\u4e00-\u9fa5A-Za-z]{1,10})\s*(\d+(?:\.\d+)?)?\s*(克|g|G|千克|kg|公斤|斤|两|毫升|ml|ML|L|升|个|只|根|条|把|颗|瓣|片|块|勺|汤匙|茶匙|包|盒|袋|张|朵)?\s*(适量|少许)?$/);
   if (m === null) {
     // “五花肉300g”连写
     const m2: RegExpMatchArray | null = cleaned.match(
-      /^([\u4e00-\u9fa5A-Za-z]{2,10})(\d+(?:\.\d+)?)(克|g|G|千克|kg|公斤|斤|两|毫升|ml|ML|个|只|根|条|把|颗|瓣|片|块|勺|汤匙|包|盒|袋|张|朵)$/);
+      /^([\u4e00-\u9fa5A-Za-z]{1,10})(\d+(?:\.\d+)?)(克|g|G|千克|kg|公斤|斤|两|毫升|ml|ML|个|只|根|条|把|颗|瓣|片|块|勺|汤匙|包|盒|袋|张|朵)$/);
     if (m2 === null) {
       return new RecipeIngredient(cleaned, 0, '适量', cleaned);
     }

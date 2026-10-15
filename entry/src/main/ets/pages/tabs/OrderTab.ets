@@ -3,7 +3,7 @@ import { promptAction } from '@kit.ArkUI';
 import { DailyMenu, Recipe, ShoppingItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { MenuPlanner } from '../../service/MenuPlanner';
-import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
+import { topAvoid } from '../../utils/Theme';
 
 @Component
 export struct OrderTab {
@@ -191,7 +191,7 @@ export struct OrderTab {
         }
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: this.statusBarHeight + NAV_TITLE_HEIGHT + 8, bottom: 120 })
+      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 120 })
     }
     .layoutWeight(1)
     .scrollBar(BarState.Off)

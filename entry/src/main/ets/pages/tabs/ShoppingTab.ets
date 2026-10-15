@@ -1,7 +1,7 @@
 /** 功能三：采购清单 —— 按点菜汇总 + 当日基础菜价参考区间 */
 import { DataStore } from '../../service/DataStore';
 import { ShoppingItem } from '../../model/Models';
-import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
+import { topAvoid } from '../../utils/Theme';
 
 @Component
 export struct ShoppingTab {
@@ -20,12 +20,20 @@ export struct ShoppingTab {
     this.items = DataStore.getShopping();
   }
 
+  /** 数量展示：≥250g 按千克（2 位小数），其余按克/原单位 */
+  private amountText(item: ShoppingItem): string {
+    if (item.unit === '克') {
+      return item.amount >= 250 ? `${(item.amount / 1000).toFixed(2)} kg` : `${item.amount} 克`;
+    }
+    return `${item.amount} ${item.unit}`;
+  }
+
   build() {
     Column() {
       Row() {
-        Text('当日基础菜价参考（区间按市场波动 ±15%）')
+        Text('菜价参考：惠友超市 / 网络公开价（±15%）')
           .fontSize(12).fontColor($r('app.color.text_tertiary'))
-        Blank()
+          .layoutWeight(1)
         Text('清除已购')
           .fontSize(13).fontColor($r('app.color.accent'))
           .onClick((): void => {
@@ -33,7 +41,7 @@ export struct ShoppingTab {
           })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: this.statusBarHeight + NAV_TITLE_HEIGHT + 8, bottom: 12 })
+      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 12 })
 
       if (this.items.length === 0) {
         Column({ space: 10 }) {
@@ -63,17 +71,22 @@ export struct ShoppingTab {
                       .padding({ left: 6, right: 6, top: 1, bottom: 1 })
                       .borderRadius(6)
                   }
-                  Text(item.unit === '克'
-                    ? `${item.amount >= 1000 ? (item.amount / 1000).toFixed(1) + ' kg' : item.amount + ' 克'}`
-                    : `${item.amount} ${item.unit}`)
+                  Text(this.amountText(item))
                     .fontSize(13).fontColor($r('app.color.text_secondary'))
                 }
                 .alignItems(HorizontalAlign.Start)
                 .layoutWeight(1)
                 Column({ space: 3 }) {
-                  Text(`¥${item.priceLow} ~ ${item.priceHigh}`)
+                  // 预计花费（本次所需量 × 单价 ±15%）
+                  Text(`预计 ¥${item.priceLow} ~ ${item.priceHigh}`)
                     .fontSize(14).fontColor($r('app.color.text_primary')).fontWeight(FontWeight.Medium)
-                  Text('参考价').fontSize(11).fontColor($r('app.color.text_tertiary'))
+                  // 单价 + 所需量：250g 以上按千克显示
+                  if (item.pricePerKg > 0) {
+                    Text(`¥${item.pricePerKg}/kg × ${this.amountText(item)}`)
+                      .fontSize(11).fontColor($r('app.color.text_tertiary'))
+                  } else {
+                    Text('参考价').fontSize(11).fontColor($r('app.color.text_tertiary'))
+                  }
                 }
               }
               .width('100%')

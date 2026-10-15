@@ -1,6 +1,7 @@
 /** 本地数据仓库：preferences 持久化菜谱 / 点菜记录 / 采购清单 / 食材库存 */
 import { preferences } from '@kit.ArkData';
 import { DailyMenu, Recipe, ShoppingItem, StockItem } from '../model/Models';
+import { RecipeParser } from './RecipeParser';
 
 const STORE_NAME: string = 'ixiachu_data';
 const KEY_RECIPES: string = 'recipes_json';
@@ -26,11 +27,41 @@ export class DataStore {
     DataStore.menus = DataStore.loadMenus();
     DataStore.shopping = DataStore.loadShopping();
     DataStore.stock = DataStore.loadStock();
+    DataStore.migrateIngredientNames();
     // 版本号 +1：让订阅 dataRev 的页面在异步初始化完成后刷新一次
     DataStore.rev += 1;
     AppStorage.setOrCreate<number>('dataRev', DataStore.rev);
     // 采购清单用专属键强广播（@StorageLink 直连，不依赖 dataRev 间接刷新）
     DataStore.publishShopping();
+  }
+
+  /**
+   * 存量数据修复：旧版解析器把「盐 3克」整串当成了食材名（单字名不匹配正则）。
+   * 名字里含数字的食材按原文重新解析一遍，并重算该菜谱营养估算。
+   */
+  private static migrateIngredientNames(): void {
+    let changed: boolean = false;
+    for (const r of DataStore.recipes) {
+      let recipeChanged: boolean = false;
+      for (const ing of r.ingredients) {
+        if (/\d/.test(ing.name)) {
+          const fixed = RecipeParser.ingredientFromRaw(ing.raw.length > 0 ? ing.raw : ing.name);
+          if (fixed !== null && !/\d/.test(fixed.name)) {
+            ing.name = fixed.name;
+            ing.amount = fixed.amount;
+            ing.unit = fixed.unit;
+            recipeChanged = true;
+          }
+        }
+      }
+      if (recipeChanged) {
+        r.nutrition = RecipeParser.estimateNutrition(r.ingredients, r.servings);
+        changed = true;
+      }
+    }
+    if (changed) {
+      DataStore.persist(KEY_RECIPES, DataStore.recipes);
+    }
   }
 
   /** 采购清单变化广播：OrderTab 生成 / ShoppingTab 勾选 / 清除已购 统一走这里 */

@@ -3,7 +3,7 @@ import { router } from '@kit.ArkUI';
 import { StockItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { Freshness } from '../../service/Freshness';
-import { NAV_TITLE_HEIGHT } from '../../utils/Theme';
+import { topAvoid } from '../../utils/Theme';
 
 @Component
 export struct PantryTab {
@@ -37,7 +37,7 @@ export struct PantryTab {
         })
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: this.statusBarHeight + NAV_TITLE_HEIGHT + 8, bottom: 12 })
+      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 12 })
 
       if (this.stock.length === 0) {
         Column({ space: 10 }) {

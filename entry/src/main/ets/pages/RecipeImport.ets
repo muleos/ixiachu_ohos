@@ -58,7 +58,7 @@ struct RecipeImport {
       }
       .width('100%')
       .height(44)
-      .padding({ left: 12, right: 20, top: this.statusBarHeight })
+      .padding({ left: 12, right: 20, top: Math.max(this.statusBarHeight, 36) })
 
       Scroll() {
         Column({ space: 14 }) {
