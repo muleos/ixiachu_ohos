@@ -1,6 +1,6 @@
-/** 功能四：食材管理 —— 小票识别入库 / 新鲜度 / 手动校准 / 库存优先推荐 */
+/** 功能四：食材管理 —— 小票识别入库 / 新鲜度 / 手动校准 / 库存优先推荐 / 消耗记录 */
 import { router } from '@kit.ArkUI';
-import { StockItem } from '../../model/Models';
+import { ConsumeRecord, FreshLevel, StockItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { Freshness } from '../../service/Freshness';
 import { topAvoid } from '../../utils/Theme';
@@ -11,17 +11,22 @@ export struct PantryTab {
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
   @StorageProp('dataRev') @Watch('reload') dataRev: number = 0;
   @State stock: StockItem[] = [];
+  @State consume: ConsumeRecord[] = [];
+  @State showConsume: boolean = false;
+  @State editing: StockItem | null = null;
+  @State editAmount: string = '';
 
   aboutToAppear(): void {
     this.reload();
   }
 
   build() {
-    Column() {
-      Row() {
-        Text('按采购日期与气候估算新鲜程度；点菜时自动优先消耗剩余食材')
-          .fontSize(12).fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
+    Stack() {
+      Column() {
+        Row() {
+          Text(this.soonCount() > 0 ? `${this.soonCount()} 项食材临期，建议优先食用` : '按采购日期与气候估算新鲜程度；点菜时自动扣减库存')
+            .fontSize(12).fontColor(this.soonCount() > 0 ? $r('app.color.tag_orange') : $r('app.color.text_tertiary'))
+            .layoutWeight(1)
         Button() {
           Row({ space: 6 }) {
             SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(16).fontColor([$r('app.color.accent')])
@@ -64,6 +69,43 @@ export struct PantryTab {
               this.StockCard(item)
             }
           }, (item: StockItem): string => `${item.id}_${this.dataRev}_${item.amount}`)
+
+          // 近期消耗（点菜扣减记录，可折叠）
+          if (this.consume.length > 0) {
+            ListItem() {
+              Column({ space: 8 }) {
+                Row({ space: 6 }) {
+                  SymbolGlyph($r('sys.symbol.clock')).fontSize(14).fontColor([$r('app.color.text_secondary')])
+                  Text(`近期消耗（${this.consume.length}）`).fontSize(14).fontWeight(FontWeight.Medium)
+                    .fontColor($r('app.color.text_primary'))
+                  Blank()
+                  SymbolGlyph(this.showConsume ? $r('sys.symbol.chevron_up') : $r('sys.symbol.chevron_down'))
+                    .fontSize(14).fontColor([$r('app.color.text_tertiary')])
+                }
+                .width('100%')
+                .onClick((): void => {
+                  this.showConsume = !this.showConsume;
+                })
+                if (this.showConsume) {
+                  ForEach(this.consume.slice(0, 10), (c: ConsumeRecord): void => {
+                    Row({ space: 8 }) {
+                      Text(c.date.substring(5)).fontSize(12).fontColor($r('app.color.text_tertiary'))
+                      Text(`${c.recipeName} · ${c.foodName}`).fontSize(13).fontColor($r('app.color.text_primary'))
+                        .layoutWeight(1)
+                        .maxLines(1).textOverflow({ overflow: TextOverflow.Ellipsis })
+                      Text(`-${c.amount} ${c.unit}`).fontSize(13).fontColor($r('app.color.accent'))
+                    }
+                    .width('100%').padding({ top: 4, bottom: 4 })
+                  }, (c: ConsumeRecord): string => c.id)
+                  Text('点菜确认后按菜谱用量自动扣减；数量不符时可在上方校准')
+                    .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%')
+                }
+              }
+              .width('100%').padding(14)
+              .borderRadius(14)
+              .backgroundColor($r('app.color.card_background'))
+            }
+          }
         }
         .layoutWeight(1)
         .width('100%')
@@ -73,10 +115,73 @@ export struct PantryTab {
     }
     .width('100%')
     .height('100%')
+
+    // 校准弹层：全屏半透明遮罩 + 居中卡片；点遮罩关闭
+    if (this.editing !== null) {
+      Column()
+        .width('100%')
+        .height('100%')
+        .backgroundColor('rgba(0,0,0,0.4)')
+        .onClick((): void => {
+          this.editing = null;
+        })
+      Column({ space: 14 }) {
+        Text(`校准「${(this.editing as StockItem).name}」剩余量`).fontSize(16).fontWeight(FontWeight.Medium)
+          .fontColor($r('app.color.text_primary'))
+        TextInput({ text: this.editAmount, placeholder: `当前 ${(this.editing as StockItem).amount} ${(this.editing as StockItem).unit}` })
+          .type(InputType.NUMBER_DECIMAL)
+          .height(44).fontSize(15)
+          .fontColor($r('app.color.text_primary'))
+          .placeholderColor($r('app.color.text_tertiary'))
+          .backgroundColor($r('app.color.page_background'))
+          .borderRadius(12)
+          .onChange((v: string): void => {
+            this.editAmount = v;
+          })
+        Text(`单位：${(this.editing as StockItem).unit}；填 0 视为用完并移除`)
+          .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%')
+        Row({ space: 10 }) {
+          Button('取消').fontSize(14).height(38).borderRadius(19).layoutWeight(1)
+            .backgroundColor($r('app.color.page_background'))
+            .fontColor($r('app.color.text_secondary'))
+            .onClick((): void => {
+              this.editing = null;
+            })
+          Button('保存校准').fontSize(14).height(38).borderRadius(19).layoutWeight(1)
+            .backgroundColor($r('app.color.accent'))
+            .fontColor(Color.White)
+            .onClick((): void => {
+              const v: number = parseFloat(this.editAmount);
+              if (!isNaN(v)) {
+                DataStore.updateStockAmount((this.editing as StockItem).id, v);
+                this.reload();
+              }
+              this.editing = null;
+            })
+        }
+        .width('100%')
+      }
+      .padding(20)
+      .margin({ left: 32, right: 32 })
+      .borderRadius(18)
+      .backgroundColor($r('app.color.card_background'))
+      .width('100%')
+      .onClick((): void => {
+        // 阻断冒泡，避免点弹窗内容关闭
+      })
+    }
   }
 
   private reload(): void {
     this.stock = Freshness.snapshot();
+    this.consume = DataStore.getConsumeLog();
+  }
+
+  /** 临期统计（建议尽快食用 + 建议评估丢弃） */
+  private soonCount(): number {
+    const now: Date = new Date();
+    return this.stock.filter((s: StockItem): boolean =>
+      Freshness.level(Freshness.decayRatio(s, now)) >= FreshLevel.SOON).length;
   }
 
   @Builder
@@ -101,7 +206,8 @@ export struct PantryTab {
       }
       .width('100%')
       Row({ space: 8 }) {
-        Text(`采购于 ${this.dateText(item.buyDate)}`).fontSize(11).fontColor($r('app.color.text_tertiary'))
+        Text(`采购于 ${this.dateText(item.buyDate)}${item.lastCalibrated > 0 ? ' · 已校准' : ''}`)
+          .fontSize(11).fontColor($r('app.color.text_tertiary'))
         Blank()
         Button('用完了').fontSize(12).height(28).borderRadius(14)
           .backgroundColor($r('app.color.page_background'))
@@ -110,14 +216,12 @@ export struct PantryTab {
             DataStore.removeStock(item.id);
             this.reload();
           })
-        Button('校准减半').fontSize(12).height(28).borderRadius(14)
+        Button('校准').fontSize(12).height(28).borderRadius(14)
           .backgroundColor($r('app.color.accent_soft'))
           .fontColor($r('app.color.accent'))
           .onClick((): void => {
-            item.amount = Math.max(0, Math.round(item.amount / 2));
-            item.calibratedRatio = 1;
-            DataStore.setStock(DataStore.getStock());
-            this.reload();
+            this.editing = item;
+            this.editAmount = `${item.amount}`;
           })
       }
       .width('100%')

@@ -78,6 +78,8 @@ export class DailyMenu {
   totalKcal: number = 0;
   /** 预算估算（元） */
   budget: number = 0;
+  /** 是否已确认开做：确认时按菜谱用量扣减库存，防重复扣减 */
+  confirmed: boolean = false;
 }
 
 /** 采购清单条目 */
@@ -107,6 +109,37 @@ export class StockItem {
   baseShelfDays: number = 7;
   /** 校准：用户手动修正后的剩余比例 0~1，-1 表示未校准 */
   calibratedRatio: number = -1;
+  /** 最近一次用户校准时间（毫秒），0 表示未校准过 */
+  lastCalibrated: number = 0;
+}
+
+/** 一次库存扣减记录（消耗日志） */
+export class ConsumeRecord {
+  id: string = '';
+  /** 扣减发生的点菜记录 id */
+  menuId: string = '';
+  /** 点菜日期（yyyy-MM-dd） */
+  date: string = '';
+  /** 菜名 */
+  recipeName: string = '';
+  /** 食材名 */
+  foodName: string = '';
+  /** 扣减量 */
+  amount: number = 0;
+  /** 单位（克 或 库存原单位） */
+  unit: string = '克';
+  /** 时间戳（毫秒） */
+  time: number = 0;
+
+  constructor(menuId: string, date: string, recipeName: string, foodName: string, amount: number, unit: string, time: number) {
+    this.menuId = menuId;
+    this.date = date;
+    this.recipeName = recipeName;
+    this.foodName = foodName;
+    this.amount = amount;
+    this.unit = unit;
+    this.time = time;
+  }
 }
 
 /** 新鲜度状态 */

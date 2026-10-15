@@ -167,17 +167,22 @@ export struct OrderTab {
               }
               .width('100%').padding({ top: 6, bottom: 6 })
             }, (n: string): string => n)
-            Button('生成采购清单')
+            Button((this.menu as DailyMenu).confirmed ? '已确认开做 · 库存已按菜谱扣减' : '确认开做并生成采购清单')
               .width('100%').height(40).borderRadius(20)
-              .backgroundColor($r('app.color.accent_soft'))
-              .fontColor($r('app.color.accent'))
+              .backgroundColor((this.menu as DailyMenu).confirmed ? $r('app.color.page_background') : $r('app.color.accent_soft'))
+              .fontColor((this.menu as DailyMenu).confirmed ? $r('app.color.text_tertiary') : $r('app.color.accent'))
+              .enabled(!(this.menu as DailyMenu).confirmed)
               .onClick((): void => {
                 try {
                   const menu: DailyMenu = this.menu as DailyMenu;
                   const list: ShoppingItem[] = MenuPlanner.buildShoppingList(menu);
                   DataStore.setShopping(list);
-                  DataStore.consumeStock(menu.recipeIds);
-                  promptAction.showToast({ message: `采购清单已生成（${list.length} 项），请到「采购」页查看` });
+                  const deducted: number = DataStore.consumeStock(menu);
+                  DataStore.confirmMenu(menu.id);
+                  menu.confirmed = true;
+                  promptAction.showToast({
+                    message: `采购清单已生成（${list.length} 项），已按菜谱扣减库存 ${deducted} 处，请到「采购」页查看`
+                  });
                 } catch (e) {
                   promptAction.showToast({ message: `生成失败：${(e as Error).message}` });
                 }
