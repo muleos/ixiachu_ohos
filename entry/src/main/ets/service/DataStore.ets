@@ -308,9 +308,9 @@ export class DataStore {
             }
             st.amount = Math.max(0, st.amount - deduct);
             deducted += 1;
-            records.push(new ConsumeRecord(
-              `c${now}_${records.length}_${st.id}`, menu.id, menu.date, r.name,
-              st.name, deduct, st.unit, now));
+            const rec: ConsumeRecord = new ConsumeRecord(menu.id, menu.date, r.name, st.name, deduct, st.unit, now);
+            rec.id = `c${now}_${records.length}_${st.id}`;
+            records.push(rec);
             break;
           }
         }

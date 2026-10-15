@@ -171,6 +171,7 @@ export struct PantryTab {
       })
     }
   }
+  }
 
   private reload(): void {
     this.stock = Freshness.snapshot();
