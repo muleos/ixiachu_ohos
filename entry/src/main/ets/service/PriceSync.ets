@@ -19,7 +19,7 @@ export class PriceSync {
         method: http.RequestMethod.GET,
         connectTimeout: 8000,
         readTimeout: 8000,
-        header: { 'User-Agent': 'IXiaChu/1.6.0' }
+        header: { 'User-Agent': 'IXiaChu/1.7.0' }
       });
       if (resp.responseCode < 200 || resp.responseCode >= 300) {
         return false;

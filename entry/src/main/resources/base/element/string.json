@@ -11,6 +11,30 @@
     {
       "name": "EntryAbility_label",
       "value": "I下厨"
+    },
+    {
+      "name": "form_label",
+      "value": "I下厨卡片"
+    },
+    {
+      "name": "form_desc",
+      "value": "今日菜单与临期食材速览"
+    },
+    {
+      "name": "form_menu_small_name",
+      "value": "今日菜单"
+    },
+    {
+      "name": "form_menu_small_desc",
+      "value": "菜单前3道与人数，点击去点菜"
+    },
+    {
+      "name": "form_menu_large_name",
+      "value": "菜单与临期"
+    },
+    {
+      "name": "form_menu_large_desc",
+      "value": "今日菜单+临期食材提醒，分区点击直达"
     }
   ]
 }

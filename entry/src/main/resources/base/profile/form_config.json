@@ -1,0 +1,38 @@
+{
+  "forms": [
+    {
+      "name": "MenuSmall",
+      "displayName": "$string:form_menu_small_name",
+      "description": "$string:form_menu_small_desc",
+      "src": "./ets/widget/pages/MenuSmallCard.ets",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "colorMode": "auto",
+      "isDefault": true,
+      "updateEnabled": true,
+      "scheduledUpdateTime": "07:30",
+      "updateDuration": 1,
+      "defaultDimension": "2*2",
+      "supportDimensions": ["2*2"]
+    },
+    {
+      "name": "MenuLarge",
+      "displayName": "$string:form_menu_large_name",
+      "description": "$string:form_menu_large_desc",
+      "src": "./ets/widget/pages/MenuLargeCard.ets",
+      "window": {
+        "designWidth": 720,
+        "autoDesignWidth": true
+      },
+      "colorMode": "auto",
+      "isDefault": false,
+      "updateEnabled": true,
+      "scheduledUpdateTime": "07:30",
+      "updateDuration": 1,
+      "defaultDimension": "2*4",
+      "supportDimensions": ["2*4"]
+    }
+  ]
+}

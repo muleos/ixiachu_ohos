@@ -6,6 +6,7 @@ import { DataStore } from '../service/DataStore';
 import { ReceiptParser } from '../service/ReceiptParser';
 import { lookupFood } from '../service/NutritionDB';
 import { queryStatusBarHeight } from '../utils/Theme';
+import { WidgetSync } from '../service/WidgetSync';
 
 const SAMPLE_RECEIPT: string = `永辉超市 购物小票
 2026-10-15 08:32
@@ -177,6 +178,7 @@ struct ReceiptScan {
           }
           DataStore.addStock(this.items);
           DataStore.addLocalPrices(this.items);
+          WidgetSync.updateAll();
           promptAction.showToast({ message: `已入库 ${this.items.length} 项食材（单价已计入本地菜价参考）` });
           router.back();
         })

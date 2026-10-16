@@ -5,6 +5,7 @@ import { DataStore } from '../../service/DataStore';
 import { Freshness } from '../../service/Freshness';
 import { Weather } from '../../service/Weather';
 import { topAvoid } from '../../utils/Theme';
+import { WidgetSync } from '../../service/WidgetSync';
 
 @Component
 export struct PantryTab {
@@ -191,6 +192,7 @@ export struct PantryTab {
               const v: number = parseFloat(this.editAmount);
               if (!isNaN(v)) {
                 DataStore.updateStockAmount((this.editing as StockItem).id, v, this.editStorage);
+                WidgetSync.updateAll();
                 this.reload();
               }
               this.editing = null;
@@ -319,6 +321,7 @@ export struct PantryTab {
           .fontColor($r('app.color.text_secondary'))
           .onClick((): void => {
             DataStore.removeStock(item.id);
+            WidgetSync.updateAll();
             this.reload();
           })
         Button('校准').fontSize(12).height(28).borderRadius(14)

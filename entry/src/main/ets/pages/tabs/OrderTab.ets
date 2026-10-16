@@ -5,6 +5,7 @@ import { DataStore } from '../../service/DataStore';
 import { MenuPlanner } from '../../service/MenuPlanner';
 import { Freshness } from '../../service/Freshness';
 import { topAvoid } from '../../utils/Theme';
+import { WidgetSync } from '../../service/WidgetSync';
 
 @Component
 export struct OrderTab {
@@ -224,6 +225,7 @@ export struct OrderTab {
                   const list: ShoppingItem[] = MenuPlanner.buildShoppingList(menu);
                   DataStore.setShopping(list);
                   const deducted: number = DataStore.consumeStock(menu);
+                  WidgetSync.updateAll();
                   DataStore.confirmMenu(menu.id);
                   menu.confirmed = true;
                   promptAction.showToast({
