@@ -1,8 +1,9 @@
 /** 功能二：点菜 —— 搜索 / 人数随机 / 需求推荐 / 一键生成采购清单 */
 import { promptAction } from '@kit.ArkUI';
-import { DailyMenu, Recipe, ShoppingItem } from '../../model/Models';
+import { DailyMenu, FreshLevel, Recipe, ShoppingItem, StockItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { MenuPlanner } from '../../service/MenuPlanner';
+import { Freshness } from '../../service/Freshness';
 import { topAvoid } from '../../utils/Theme';
 
 @Component
@@ -17,6 +18,20 @@ export struct OrderTab {
   @State seasonal: boolean = false;
   @State useStock: boolean = true;
   @State menu: DailyMenu | null = null;
+
+  aboutToAppear(): void {
+    // 有临期食材时自动开启「优先消耗库存」（默认本就开启，这里兜底显式置位）
+    if (this.urgentCount() > 0) {
+      this.useStock = true;
+    }
+  }
+
+  /** 临期食材数（SOON/CHECK 级，月份代理口径） */
+  private urgentCount(): number {
+    const now: Date = new Date();
+    return DataStore.getStock().filter((s: StockItem): boolean =>
+      Freshness.level(Freshness.decayRatioSync(s, now, Freshness.monthFactor(now))) >= FreshLevel.SOON).length;
+  }
 
   build() {
     Scroll(this.pageScroller) {
@@ -134,7 +149,11 @@ export struct OrderTab {
                   this.useStock = on;
                 })
                 .selectedColor($r('app.color.accent'))
-              Text('优先消耗库存').fontSize(13).fontColor($r('app.color.text_secondary'))
+              Text(this.urgentCount() > 0
+                ? `优先消耗库存（${this.urgentCount()} 项临期，已自动开启）`
+                : '优先消耗库存')
+                .fontSize(13)
+                .fontColor(this.urgentCount() > 0 ? $r('app.color.tag_orange') : $r('app.color.text_secondary'))
             }
           }
           .width('100%')
@@ -167,6 +186,33 @@ export struct OrderTab {
               }
               .width('100%').padding({ top: 6, bottom: 6 })
             }, (n: string): string => n)
+
+            // 结构审查提示（荤素汤配比/热量超限）
+            if ((this.menu as DailyMenu).review.length > 0) {
+              Column({ space: 4 }) {
+                ForEach((this.menu as DailyMenu).review, (t: string): void => {
+                  Text(`💡 ${t}`).fontSize(12).fontColor($r('app.color.tag_orange')).width('100%')
+                }, (t: string): string => t)
+              }
+              .width('100%')
+              .padding({ top: 6, bottom: 6, left: 10, right: 10 })
+              .borderRadius(10)
+              .backgroundColor($r('app.color.page_background'))
+            }
+
+            // 营养面板（每人每餐估算）
+            Row() {
+              Text('营养估算（每人每餐）')
+                .fontSize(12).fontColor($r('app.color.text_tertiary'))
+              Blank()
+              Text(`${(this.menu as DailyMenu).totalKcal} kcal · 蛋白 ${(this.menu as DailyMenu).protein}g · 脂肪 ${(this.menu as DailyMenu).fat}g · 碳水 ${(this.menu as DailyMenu).carbs}g`)
+                .fontSize(11).fontColor($r('app.color.text_secondary'))
+            }
+            .width('100%')
+            .padding({ top: 6, bottom: 6, left: 10, right: 10 })
+            .borderRadius(10)
+            .backgroundColor($r('app.color.page_background'))
+
             Button((this.menu as DailyMenu).confirmed ? '已确认开做 · 库存已按菜谱扣减' : '确认开做并生成采购清单')
               .width('100%').height(40).borderRadius(20)
               .backgroundColor((this.menu as DailyMenu).confirmed ? $r('app.color.page_background') : $r('app.color.accent_soft'))

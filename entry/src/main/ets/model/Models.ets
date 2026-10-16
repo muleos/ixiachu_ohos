@@ -76,8 +76,16 @@ export class DailyMenu {
   recipeNames: string[] = [];
   /** 全桌总热量（每人） */
   totalKcal: number = 0;
+  /** 每人每餐蛋白质估算（克） */
+  protein: number = 0;
+  /** 每人每餐脂肪估算（克） */
+  fat: number = 0;
+  /** 每人每餐碳水估算（克） */
+  carbs: number = 0;
   /** 预算估算（元） */
   budget: number = 0;
+  /** 结构审查提示（荤素汤配比/热量超限），空表示结构合理 */
+  review: string[] = [];
   /** 是否已确认开做：确认时按菜谱用量扣减库存，防重复扣减 */
   confirmed: boolean = false;
 }

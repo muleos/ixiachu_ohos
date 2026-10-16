@@ -4,7 +4,8 @@
 import { FoodInfo, lookupFood, seasonalVeggies } from './NutritionDB';
 import { RecipeParser } from './RecipeParser';
 import { DataStore } from './DataStore';
-import { DailyMenu, Recipe, ShoppingItem } from '../model/Models';
+import { Freshness } from './Freshness';
+import { DailyMenu, FreshLevel, Recipe, ShoppingItem, StockItem } from '../model/Models';
 
 export class MenuPlanner {
   /** 搜索菜库 */
@@ -24,11 +25,32 @@ export class MenuPlanner {
     }
     const dishCount: number = Math.max(2, Math.min(people + 1, pool.length));
     const shuffled: Recipe[] = MenuPlanner.shuffle(pool);
-    const picked: Recipe[] = shuffled.slice(0, dishCount);
+    // 临期优先：洗牌后把命中临期库存的菜谱前移（保持随机性，但急消耗的菜有更高入选率）
+    const urgentNames: string[] = MenuPlanner.urgentStockNames();
+    const ordered: Recipe[] = urgentNames.length > 0
+      ? shuffled.slice().sort((a: Recipe, b: Recipe): number => {
+        const ua: number = MenuPlanner.hitsUrgent(a, urgentNames) ? 0 : 1;
+        const ub: number = MenuPlanner.hitsUrgent(b, urgentNames) ? 0 : 1;
+        return ua - ub;
+      })
+      : shuffled;
+    const picked: Recipe[] = ordered.slice(0, dishCount);
     menu.recipeIds = picked.map((r: Recipe): string => r.id);
     menu.recipeNames = picked.map((r: Recipe): string => r.name);
     MenuPlanner.fillTotals(menu, picked);
     return menu;
+  }
+
+  /** 菜谱是否命中任一临期食材 */
+  private static hitsUrgent(r: Recipe, urgentNames: string[]): boolean {
+    for (const ing of r.ingredients) {
+      for (const un of urgentNames) {
+        if (ing.name.indexOf(un) >= 0 || un.indexOf(ing.name) >= 0) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -45,8 +67,9 @@ export class MenuPlanner {
 
     if (useStock) {
       const stockNames: string[] = DataStore.getStock().map((s): string => s.name);
+      const urgentNames: string[] = MenuPlanner.urgentStockNames();
       const scored: Recipe[] = pool.slice().sort((a: Recipe, b: Recipe): number => {
-        return MenuPlanner.stockScore(b, stockNames) - MenuPlanner.stockScore(a, stockNames);
+        return MenuPlanner.stockScore(b, stockNames, urgentNames) - MenuPlanner.stockScore(a, stockNames, urgentNames);
       });
       pool = scored;
     }
@@ -73,12 +96,44 @@ export class MenuPlanner {
     return menu;
   }
 
-  private static stockScore(r: Recipe, stockNames: string[]): number {
+  /** 临期库存品名（SOON/CHECK 级，月份代理口径；推荐加权用） */
+  private static urgentStockNames(): string[] {
+    const now: Date = new Date();
+    return DataStore.getStock()
+      .filter((s: StockItem): boolean =>
+        Freshness.level(Freshness.decayRatioSync(s, now, Freshness.monthFactor(now))) >= FreshLevel.SOON)
+      .map((s: StockItem): string => s.name);
+  }
+
+  /**
+   * 库存匹配打分：普通库存命中 +2/食材；临期库存命中额外 +5（重加权，急消耗优先）。
+   * 一个食材命中多库存只计一次。
+   */
+  private static stockScore(r: Recipe, stockNames: string[], urgentNames: string[]): number {
     let score: number = 0;
     for (const ing of r.ingredients) {
+      let hit: boolean = false;
       for (const sn of stockNames) {
         if (ing.name.indexOf(sn) >= 0 || sn.indexOf(ing.name) >= 0) {
           score += 2;
+          hit = true;
+          break;
+        }
+      }
+      if (!hit) {
+        for (const un of urgentNames) {
+          if (ing.name.indexOf(un) >= 0 || un.indexOf(ing.name) >= 0) {
+            score += 5;
+            break;
+          }
+        }
+      } else {
+        // 命中普通库存的食材若同时是临期库存（同名临期），也按临期加成
+        for (const un of urgentNames) {
+          if (un === ing.name) {
+            score += 5;
+            break;
+          }
         }
       }
     }
@@ -127,15 +182,55 @@ export class MenuPlanner {
     return Math.round(cost * 10) / 10;
   }
 
-  private static fillTotals(menu: DailyMenu, picked: Recipe[]): void {
+  private static fillTotals(menu: DailyMenu, picked: Recipe[], maxKcal: number = 0): void {
     let kcal: number = 0;
+    let protein: number = 0;
+    let fat: number = 0;
+    let carbs: number = 0;
     let cost: number = 0;
     for (const r of picked) {
       kcal += r.nutrition.kcal;
+      protein += r.nutrition.protein;
+      fat += r.nutrition.fat;
+      carbs += r.nutrition.carbs;
       cost += MenuPlanner.recipeCost(r);
     }
-    menu.totalKcal = picked.length === 0 ? 0 : Math.round(kcal / Math.max(1, picked.length));
+    const n: number = Math.max(1, picked.length);
+    menu.totalKcal = picked.length === 0 ? 0 : Math.round(kcal / n);
+    menu.protein = Math.round(protein / n * 10) / 10;
+    menu.fat = Math.round(fat / n * 10) / 10;
+    menu.carbs = Math.round(carbs / n * 10) / 10;
     menu.budget = Math.round(cost * 10) / 10;
+    menu.review = MenuPlanner.menuReview(menu, picked, menu.people, maxKcal);
+  }
+
+  /**
+   * 菜单结构审查：荤素汤配比与热量上限提示（推荐/随机完成后调用）。
+   * 返回提示列表，空数组表示结构合理。
+   */
+  static menuReview(menu: DailyMenu, picked: Recipe[], people: number, maxKcal: number): string[] {
+    const tips: string[] = [];
+    const hasSoup: boolean = picked.some((r: Recipe): boolean => r.name.indexOf('汤') >= 0);
+    if (people >= 3 && !hasSoup) {
+      tips.push('3 人以上建议配一道汤');
+    }
+    let meat: number = 0;
+    let veg: number = 0;
+    for (const r of picked) {
+      if (r.tags.indexOf('荤') >= 0) {
+        meat += 1;
+      } else if (r.tags.indexOf('素') >= 0) {
+        veg += 1;
+      }
+    }
+    if (meat > 0 && veg < meat - 1) {
+      tips.push('荤素搭配偏重，可换一道素菜');
+    }
+    if (maxKcal > 0 && menu.totalKcal > maxKcal * 1.15) {
+      const over: number = Math.round((menu.totalKcal / maxKcal - 1) * 100);
+      tips.push(`热量超上限约 ${over}%，可去掉一道高热量菜`);
+    }
+    return tips;
   }
 
   /**
