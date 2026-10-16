@@ -9,6 +9,7 @@ import { KeyboardAvoidMode } from '@ohos.arkui.UIContext';
 import { applyTheme, publishInsets } from '../utils/Theme';
 import { SeedService } from '../service/SeedService';
 import { PriceSync } from '../service/PriceSync';
+import { Notify } from '../service/Notify';
 
 const DOMAIN: number = 0x1C8;
 const TAG: string = 'EntryAbility';
@@ -24,7 +25,21 @@ export default class EntryAbility extends UIAbility {
     AppStorage.setOrCreate<number>('navBarHeight', 0);
     AppStorage.setOrCreate<number>('dataRev', 0);
     AppStorage.setOrCreate<number>('shoppingRev', 0);
+    AppStorage.setOrCreate<number>('launchTab', -1);
+    // 通知点击透传：launchTab = 目标 Tab 序号（食材管理=3）
+    const tabParam: number = (want.parameters?.launchTab as number) ?? -1;
+    if (tabParam >= 0) {
+      AppStorage.setOrCreate<number>('launchTab', tabParam);
+    }
     hilog.info(DOMAIN, TAG, 'onCreate');
+  }
+
+  /** 热启动（进程存活时点通知）：onNewWant 透传 launchTab，MainTab @Watch 响应切页 */
+  onNewWant(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    const tabParam: number = (want.parameters?.launchTab as number) ?? -1;
+    if (tabParam >= 0) {
+      AppStorage.setOrCreate<number>('launchTab', tabParam);
+    }
   }
 
   onWindowStageCreate(windowStage: window.WindowStage): void {
@@ -63,6 +78,10 @@ export default class EntryAbility extends UIAbility {
     // 启动静默同步云端菜价（惠友到家数据 → GitHub prices 分支），失败不影响使用
     PriceSync.sync().catch((): void => {
     });
+    // 临期检查 + 本地通知（延迟 3s：等首帧/授权弹窗窗口就绪；静默失败）
+    setTimeout((): void => {
+      Notify.checkAndPublish(this.context);
+    }, 3000);
   }
 
   private syncTheme(): void {

@@ -337,6 +337,12 @@ export class DataStore {
     return info !== null ? info.pricePerJin * 2 : 0;
   }
 
+  /** 清空本地小票价库（设置页数据维护） */
+  static clearLocalPrices(): void {
+    DataStore.localPrices = new Map<string, LocalPricePoint[]>();
+    DataStore.persist(KEY_LOCAL_PRICES, {});
+  }
+
   /** 某品名是否有本地真实价（采购页标记用） */
   static hasLocalPrice(name: string): boolean {
     const list: LocalPricePoint[] | undefined = DataStore.localPrices.get(name);

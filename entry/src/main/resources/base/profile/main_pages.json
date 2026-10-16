@@ -5,6 +5,7 @@
     "pages/RecipeDetail",
     "pages/ReceiptScan",
     "pages/StockManual",
-    "pages/MenuScan"
+    "pages/MenuScan",
+    "pages/Settings"
   ]
 }

@@ -63,6 +63,17 @@ export struct PantryTab {
         .onClick((): void => {
           router.pushUrl({ url: 'pages/ReceiptScan' });
         })
+        Button() {
+          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(17).fontColor([$r('app.color.text_secondary')])
+        }
+        .backgroundColor($r('app.color.accent_soft'))
+        .height(36)
+        .width(52)
+        .borderRadius(18)
+        .margin({ left: 10 })
+        .onClick((): void => {
+          router.pushUrl({ url: 'pages/Settings' });
+        })
       }
       .width('100%')
       .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 12 })

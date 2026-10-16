@@ -21,6 +21,8 @@ const TAB_BAR_HEIGHT: number = 56;
 @Component
 struct MainTab {
   @StorageProp('isDarkMode') @Watch('onThemeChanged') isDark: boolean = false;
+  /** 通知点击透传的目标 Tab（launchTab>=0 时切换；onNewWant 热启动也会触发本 Watch） */
+  @StorageProp('launchTab') @Watch('onLaunchTab') launchTab: number = -1;
   @State activeTab: number = 0;
   @State hdsTabsModifier: HdsTabsModifier = new HdsTabsModifier();
   private hdsTabsController: HdsTabsController = new HdsTabsController();
@@ -32,6 +34,11 @@ struct MainTab {
 
   aboutToAppear(): void {
     this.configureHdsTabs();
+    // 冷启动通知透传：直接落在目标 Tab
+    const tab: number = AppStorage.get<number>('launchTab') ?? -1;
+    if (tab >= 0) {
+      this.activeTab = tab;
+    }
     // 深浅色监听：初始化 isDarkMode（冷启动即处于深色时也能正确置位）
     try {
       this.mqListener = this.getUIContext().getMediaQuery().matchMediaSync('(dark-mode: true)');
@@ -73,6 +80,14 @@ struct MainTab {
         }
       });
     this.hdsTabsModifier = modifier;
+  }
+
+  /** 热启动点通知：AppStorage.launchTab 变化 → 切页 */
+  onLaunchTab(): void {
+    if (this.launchTab >= 0) {
+      this.activeTab = this.launchTab;
+      AppStorage.setOrCreate<number>('launchTab', -1);
+    }
   }
 
   private currentTitle(): string {
