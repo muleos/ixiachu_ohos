@@ -80,6 +80,8 @@ export class ReceiptParser {
       // 已命中的数量表达式/数字 token（金额解析前从行内剔除，避免金额与数量混淆）
       let kgToken: string = '';
       let countToken: string = '';
+      let xm: RegExpMatchArray | null = null;
+      let cm: RegExpMatchArray | null = null;
       // ① 带重量单位的数字：西红柿 1.25kg / 土豆 2斤 / 排骨 500g（OCR 丢空格时「1.25kg9.90」也要能命中）
       const wm: RegExpMatchArray | null =
         line.match(/(?<![A-Za-z0-9.])(\d+(?:\.\d+)?)\s*(kg|KG|Kg|千克|克|g|斤|两)(?![A-Za-z])/);
@@ -98,8 +100,8 @@ export class ReceiptParser {
         unit = '克';
       } else {
         // ② 计数单位：鸡蛋 2盒25.6（丢空格）/ 啤酒 6瓶 / 鸡蛋 1份；以及 ×N 形式（土豆×3）
-        const xm: RegExpMatchArray | null = line.match(/[xX×]\s*(\d{1,2})(?!\d)/);
-        const cm: RegExpMatchArray | null = xm !== null ? null
+        xm = line.match(/[xX×]\s*(\d{1,2})(?!\d)/);
+        cm = xm !== null ? null
           : line.match(/(?<![A-Za-z0-9.])(\d+(?:\.\d+)?)\s*(个|盒|袋|包|瓶|罐|桶|把|根|只|条|块|颗|粒|支|枚|份)(?![\u4e00-\u9fa5A-Za-z])/);
         if (xm !== null) {
           amount = parseInt(xm[1], 10);
