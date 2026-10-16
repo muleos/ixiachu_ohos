@@ -101,15 +101,28 @@ struct Settings {
             .width('100%').padding(16).borderRadius(16)
             .backgroundColor($r('app.color.card_background'))
 
+            // 隐私政策
+            Row({ space: 10 }) {
+              Text('隐私政策').fontSize(15).fontColor($r('app.color.text_primary'))
+              Blank()
+              SymbolGlyph($r('sys.symbol.chevron_right'))
+                .fontSize(14).fontColor([$r('app.color.text_tertiary')])
+            }
+            .width('100%').padding(16).borderRadius(16)
+            .backgroundColor($r('app.color.card_background'))
+            .onClick((): void => {
+              router.pushUrl({ url: 'pages/Privacy' });
+            })
+
             // 关于
             Column({ space: 4 }) {
               Row({ space: 10 }) {
                 Text('I下厨').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
                 Blank()
-                Text('v1.6.0').fontSize(13).fontColor($r('app.color.text_tertiary'))
+                Text('v1.8.0').fontSize(13).fontColor($r('app.color.text_tertiary'))
               }
               .width('100%')
-              Text('菜谱管理 · 点菜推荐 · 采购清单 · 食材管理')
+              Text('菜谱管理 · 点菜推荐 · 采购清单 · 食材管理 · 桌面卡片')
                 .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%')
             }
             .width('100%').padding(16).borderRadius(16)

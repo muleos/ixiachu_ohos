@@ -7,6 +7,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { KeyboardAvoidMode } from '@ohos.arkui.UIContext';
 import { applyTheme, publishInsets } from '../utils/Theme';
+import { DataStore } from '../service/DataStore';
 import { SeedService } from '../service/SeedService';
 import { PriceSync } from '../service/PriceSync';
 import { Notify } from '../service/Notify';
@@ -55,33 +56,36 @@ export default class EntryAbility extends UIAbility {
       hilog.error(DOMAIN, TAG, 'setKeyboardAvoidMode throw: %{public}s', (err as Error).message);
     }
     // 首帧默认浅色；深浅色切换由 onConfigurationUpdate 统一接管
-    windowStage.loadContent('pages/MainTab', (err): void => {
-      if (err.code) {
-        hilog.error(DOMAIN, TAG, 'loadContent failed: %{public}s', JSON.stringify(err));
-        return;
-      }
-      publishInsets(mainWindow);
-      mainWindow.on('avoidAreaChange', (): void => {
+    // 数据仓库初始化必须先于首帧：v1.2.2 起 init 无人调用导致持久化失效（历史 P0），此处串入启动链
+    DataStore.init(this.context).then((): void => {
+      this.syncTheme();
+      windowStage.loadContent('pages/MainTab', (err): void => {
+        if (err.code) {
+          hilog.error(DOMAIN, TAG, 'loadContent failed: %{public}s', JSON.stringify(err));
+          return;
+        }
         publishInsets(mainWindow);
+        mainWindow.on('avoidAreaChange', (): void => {
+          publishInsets(mainWindow);
+        });
+        // 兜底：个别机型首帧后避让区才就绪
+        setTimeout((): void => {
+          publishInsets(mainWindow);
+        }, 200);
+        setTimeout((): void => {
+          publishInsets(mainWindow);
+        }, 900);
       });
-      // 兜底：个别机型首帧后避让区才就绪
+      // 首启种入「下厨房精选」菜谱（异步，不阻塞首帧）
+      SeedService.seedIfNeed(this.context);
+      // 启动静默同步云端菜价（惠友到家数据 → GitHub prices 分支），失败不影响使用
+      PriceSync.sync().catch((): void => {
+      });
+      // 临期检查 + 本地通知（延迟 3s：等首帧/授权弹窗窗口就绪；静默失败）
       setTimeout((): void => {
-        publishInsets(mainWindow);
-      }, 200);
-      setTimeout((): void => {
-        publishInsets(mainWindow);
-      }, 900);
+        Notify.checkAndPublish(this.context);
+      }, 3000);
     });
-    this.syncTheme();
-    // 首启种入「下厨房精选」菜谱（异步，不阻塞首帧）
-    SeedService.seedIfNeed(this.context);
-    // 启动静默同步云端菜价（惠友到家数据 → GitHub prices 分支），失败不影响使用
-    PriceSync.sync().catch((): void => {
-    });
-    // 临期检查 + 本地通知（延迟 3s：等首帧/授权弹窗窗口就绪；静默失败）
-    setTimeout((): void => {
-      Notify.checkAndPublish(this.context);
-    }, 3000);
   }
 
   private syncTheme(): void {

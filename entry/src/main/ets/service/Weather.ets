@@ -149,7 +149,7 @@ export class Weather {
         method: http.RequestMethod.GET,
         connectTimeout: 6000,
         readTimeout: 6000,
-        header: { 'User-Agent': 'IXiaChu/1.7.0' }
+        header: { 'User-Agent': 'IXiaChu/1.8.0' }
       });
       if (resp.responseCode !== 200) {
         return -999;

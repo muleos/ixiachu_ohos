@@ -6,6 +6,7 @@
     "pages/ReceiptScan",
     "pages/StockManual",
     "pages/MenuScan",
-    "pages/Settings"
+    "pages/Settings",
+    "pages/Privacy"
   ]
 }

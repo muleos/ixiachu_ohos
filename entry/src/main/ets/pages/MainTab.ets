@@ -4,12 +4,14 @@
  * 底栏：barHeight 56 / barBottomMargin 30 / IMMERSIVE 材质，选中色 = 品牌 accent。
  * 顶栏：IMMERSIVE_GRADIENT_BLUR 滚动光感，bindToScrollable 绑定各页滚动器。
  */
-import { LengthMetrics, SymbolGlyphModifier, mediaquery } from '@kit.ArkUI';
+import { LengthMetrics, SymbolGlyphModifier, mediaquery, router } from '@kit.ArkUI';
 import {
   HdsNavigation, HdsNavigationTitleMode, HdsTabs, HdsTabsController, HdsTabsModifier,
   hdsMaterial, DividerShowType, ScrollEffectType, TitleBarStyleOptions
 } from '@kit.UIDesignKit';
+import { common } from '@kit.AbilityKit';
 import { accentColor } from '../utils/Theme';
+import { DataStore } from '../service/DataStore';
 import { MenuLibraryTab } from './tabs/MenuLibraryTab';
 import { OrderTab } from './tabs/OrderTab';
 import { ShoppingTab } from './tabs/ShoppingTab';
@@ -24,6 +26,8 @@ struct MainTab {
   /** 通知点击透传的目标 Tab（launchTab>=0 时切换；onNewWant 热启动也会触发本 Watch） */
   @StorageProp('launchTab') @Watch('onLaunchTab') launchTab: number = -1;
   @State activeTab: number = 0;
+  /** 首启隐私同意（AGC 审核 4.1：未同意前遮罩阻断使用） */
+  @State showPrivacy: boolean = DataStore.getSetting('privacy_agreed') !== '1';
   @State hdsTabsModifier: HdsTabsModifier = new HdsTabsModifier();
   private hdsTabsController: HdsTabsController = new HdsTabsController();
   private libraryScroller: Scroller = new Scroller();
@@ -224,5 +228,57 @@ struct MainTab {
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+
+    // 首启隐私同意弹层（审核 4.1）：同意前阻断使用；可看全文；不同意退出
+    if (this.showPrivacy) {
+      Column() {
+        Column({ space: 14 }) {
+          Text('用户协议与隐私政策').fontSize(17).fontWeight(FontWeight.Bold)
+            .fontColor($r('app.color.text_primary'))
+          Scroll() {
+            Text('欢迎使用 I下厨。在开始使用前，请阅读并了解《隐私政策》：\n\n· 本应用不注册、不登录，不收集任何身份信息；\n· 菜谱、库存、采购清单等数据仅保存在您的设备本地；\n· 联网仅用于获取云端菜价参考与所选城市气温（只读请求，不含个人信息）；\n· 小票照片仅在本机识别，不上传；\n· 无广告、无第三方追踪。')
+              .fontSize(13).lineHeight(21)
+              .fontColor($r('app.color.text_secondary'))
+              .width('100%')
+          }
+          .constraintSize({ maxHeight: 220 })
+          .scrollBar(BarState.Auto)
+          Text('点击「同意并继续」即表示您已阅读并同意上述内容与完整《隐私政策》。')
+            .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%')
+          Text('查看完整《隐私政策》')
+            .fontSize(13).fontColor($r('app.color.accent'))
+            .width('100%')
+            .onClick((): void => {
+              router.pushUrl({ url: 'pages/Privacy' });
+            })
+          Row({ space: 10 }) {
+            Button('不同意并退出').fontSize(14).height(40).borderRadius(20).layoutWeight(1)
+              .backgroundColor($r('app.color.page_background'))
+              .fontColor($r('app.color.text_secondary'))
+              .onClick((): void => {
+                (getContext(this) as common.UIAbilityContext).terminateSelf();
+              })
+            Button('同意并继续').fontSize(14).height(40).borderRadius(20).layoutWeight(1)
+              .backgroundColor($r('app.color.accent'))
+              .fontColor(Color.White)
+              .onClick((): void => {
+                DataStore.setSetting('privacy_agreed', '1');
+                this.showPrivacy = false;
+              })
+          }
+          .width('100%')
+        }
+        .padding(20)
+        .margin({ left: 24, right: 24 })
+        .borderRadius(20)
+        .backgroundColor($r('app.color.card_background'))
+        .width('100%')
+      }
+      .width('100%')
+      .height('100%')
+      .backgroundColor('rgba(0,0,0,0.5)')
+      .justifyContent(FlexAlign.Center)
+      .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+    }
   }
 }
