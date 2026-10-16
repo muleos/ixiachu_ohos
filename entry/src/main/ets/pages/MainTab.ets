@@ -175,6 +175,7 @@ struct MainTab {
   }
 
   build() {
+    Stack() {
     HdsNavigation() {
       HdsTabs({ controller: this.hdsTabsController, index: this.activeTab }) {
         TabContent() {
@@ -280,5 +281,8 @@ struct MainTab {
       .justifyContent(FlexAlign.Center)
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
     }
+    }
+    .width('100%')
+    .height('100%')
   }
 }

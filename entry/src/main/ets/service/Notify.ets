@@ -67,7 +67,7 @@ export class Notify {
           DataStore.setSetting(ASKED_KEY, '1');
         } catch (e) {
           DataStore.setSetting(ASKED_KEY, '1');
-          DataStore.setEnabled(false);
+          Notify.setEnabled(false);
           return;
         }
       } else {
@@ -78,6 +78,7 @@ export class Notify {
       }
       // 点击通知拉起主页并切到食材管理 Tab
       const agent = await wantAgent.getWantAgent({
+        requestCode: 0,
         wants: [{
           bundleName: 'com.hmos.ixiachu',
           abilityName: 'EntryAbility',

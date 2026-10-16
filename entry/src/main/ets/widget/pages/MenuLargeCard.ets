@@ -58,7 +58,7 @@ struct MenuLargeCard {
       .width('100%')
       .padding(14)
       .borderRadius(14)
-      .backgroundColor($r('sys.color.comp_background_regular'))
+      .backgroundColor($r('app.color.card_background'))
       .onClick((): void => {
         postCardAction(this, {
           action: 'router',
@@ -111,7 +111,7 @@ struct MenuLargeCard {
       .width('100%')
       .padding(14)
       .borderRadius(14)
-      .backgroundColor($r('sys.color.comp_background_regular'))
+      .backgroundColor($r('app.color.card_background'))
       .onClick((): void => {
         postCardAction(this, {
           action: 'router',

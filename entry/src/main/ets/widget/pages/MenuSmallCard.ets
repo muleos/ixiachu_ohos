@@ -62,7 +62,7 @@ struct MenuSmallCard {
     .width('100%')
     .height('100%')
     .padding(14)
-    .backgroundColor($r('sys.color.comp_background_regular'))
+    .backgroundColor($r('app.color.card_background'))
     .borderRadius(16)
     .onClick((): void => {
       postCardAction(this, {

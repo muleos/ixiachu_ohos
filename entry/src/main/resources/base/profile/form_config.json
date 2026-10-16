@@ -5,6 +5,7 @@
       "displayName": "$string:form_menu_small_name",
       "description": "$string:form_menu_small_desc",
       "src": "./ets/widget/pages/MenuSmallCard.ets",
+      "uiSyntax": "arkts",
       "window": {
         "designWidth": 720,
         "autoDesignWidth": true
@@ -22,6 +23,7 @@
       "displayName": "$string:form_menu_large_name",
       "description": "$string:form_menu_large_desc",
       "src": "./ets/widget/pages/MenuLargeCard.ets",
+      "uiSyntax": "arkts",
       "window": {
         "designWidth": 720,
         "autoDesignWidth": true

@@ -208,8 +208,8 @@ struct Settings {
         { text: '取消', color: '#666666' },
         { text: '清空', color: '#F8284C' }
       ]
-    }).then((idx: number) => {
-      if (idx === 1) {
+    }).then((result: promptAction.ShowDialogSuccessResponse) => {
+      if (result.index === 1) {
         DataStore.clearLocalPrices();
         this.localPriceCount = 0;
         promptAction.showToast({ message: '已清空本地价数据' });

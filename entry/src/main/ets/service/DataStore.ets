@@ -340,7 +340,8 @@ export class DataStore {
   /** 清空本地小票价库（设置页数据维护） */
   static clearLocalPrices(): void {
     DataStore.localPrices = new Map<string, LocalPricePoint[]>();
-    DataStore.persist(KEY_LOCAL_PRICES, {});
+    const empty: Record<string, LocalPricePoint[]> = {};
+    DataStore.persist(KEY_LOCAL_PRICES, empty);
   }
 
   /** 某品名是否有本地真实价（采购页标记用） */
