@@ -274,6 +274,10 @@ export class ReceiptParser {
     if (result.resultCode !== 0) {
       return '';
     }
+    // 相机返回时文件可能尚未完全落盘，稍候再读，避免截断 JPEG 触发解码异常
+    await new Promise<void>((resolve: () => void): void => {
+      setTimeout(resolve, 200);
+    });
     try {
       const st: fileIo.Stat = fileIo.statSync(path);
       return st.size > 0 ? path : '';
@@ -296,7 +300,9 @@ export class ReceiptParser {
   }
 
   /**
-   * fd → PixelMap →（超宽压缩到 1280 提速提准）→ OCR 文本。
+   * fd → （解码期等比降到 ≤1280 宽）→ OCR 文本。
+   * 不再「先全尺寸解码再 scale」——大图 scale 在部分设备会触发原生崩溃，
+   * 且全尺寸解码内存峰值高；改为 createPixelMap 时 desiredSize 直接降采样。
    * 失败抛异常由调用方处理；资源在 finally 中释放。
    */
   private static async recognizeFd(fd: number): Promise<string> {
@@ -304,14 +310,14 @@ export class ReceiptParser {
     let pixelMap: image.PixelMap | null = null;
     try {
       fileSource = await image.createImageSource(fd);
-      pixelMap = await fileSource.createPixelMap();
-      // OCR 前压缩：相机原图动辄 3000+ 宽，等比缩到 1280 内（识别更稳更快）
-      const imgInfo: image.ImageInfo = pixelMap.getImageInfoSync();
-      const w: number = imgInfo.size.width;
+      const srcInfo: image.ImageInfo = await fileSource.getImageInfo();
+      const w: number = srcInfo.size.width;
+      const opts: image.DecodingOptions = { };
       if (w > 1280) {
-        const s: number = 1280 / w;
-        await pixelMap.scale(s, s);
+        const h: number = srcInfo.size.height;
+        opts.desiredSize = { width: 1280, height: Math.max(1, Math.round(h * 1280 / w)) };
       }
+      pixelMap = await fileSource.createPixelMap(opts);
       if (!ReceiptParser.ocrInited) {
         await textRecognition.init();
         ReceiptParser.ocrInited = true;
