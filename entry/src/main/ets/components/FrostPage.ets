@@ -67,8 +67,9 @@ export struct FrostPage {
     HdsNavigation() {
       Scroll(this.scroller) {
         Column() {
-          // 首项避让 spacer：随内容滚走，内容透出到标题栏后面（光感采样）
-          Column().width('100%').padding({ top: topAvoid(this.inset()) + 12 })
+          // 首项避让 spacer：显式高度（空容器 padding 在部分管线会被折叠），
+          // 随内容滚走，内容透出到标题栏后面（光感采样）
+          Column().width('100%').height(topAvoid(this.inset()) + 12)
           this.content()
           // 尾部留白：避让小白条手势区
           Column().height(48).width('100%')

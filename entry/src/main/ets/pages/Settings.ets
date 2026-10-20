@@ -61,8 +61,9 @@ struct Settings {
       HdsNavigation() {
         Scroll(this.scroller) {
           Column({ space: 14 }) {
-            // 首项避让 spacer：随内容滚走，内容透出到标题栏后面（光感采样）
-            Column().width('100%').padding({ top: topAvoid(this.topInset()) + 12 })
+            // 首项避让 spacer：显式高度（空容器 padding 在部分管线会被折叠），
+            // 随内容滚走，内容透出到标题栏后面（光感采样）
+            Column().width('100%').height(topAvoid(this.topInset()) + 12)
 
             // 临期提醒
             Column({ space: 4 }) {
