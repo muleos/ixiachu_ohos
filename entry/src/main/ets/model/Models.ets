@@ -60,8 +60,10 @@ export class Recipe {
   grade: string = '';
   /** 小贴士（下厨房数据） */
   tip: string = '';
-  /** 来源：手动导入 / 下厨房精选 / 在线导入 */
+  /** 来源：手动导入 / 下厨房精选 / 在线导入 / 手动创建 */
   source: string = '手动导入';
+  /** 封面图本地路径（手动创建选填，空为无封面） */
+  cover: string = '';
   /** 原始导入文本 */
   sourceText: string = '';
   importTime: number = 0;

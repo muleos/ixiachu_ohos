@@ -1,8 +1,8 @@
 /** 隐私政策 —— 内置全文页（离线可看，AGC 审核友好），设置页与首启弹窗均可进入 */
 import { router } from '@kit.ArkUI';
-import { queryStatusBarHeight } from '../utils/Theme';
+import { FrostPage } from '../components/FrostPage';
 
-const PRIVACY_TEXT: string = `更新日期：2026-10-20　版本：v1.9.0
+const PRIVACY_TEXT: string = `更新日期：2026-10-20　版本：v1.10.0
 
 「I下厨」（以下简称"本应用"）是一款本地菜谱管理与点菜助手工具。我们非常重视您的隐私，本政策说明本应用如何处理信息。
 
@@ -18,7 +18,7 @@ const PRIVACY_TEXT: string = `更新日期：2026-10-20　版本：v1.9.0
 除上述两类只读请求外，本应用不会向任何服务器发送您的数据。
 
 三、系统能力说明
-1. 相机/相册：小票识别使用系统相机拍摄或相册选图，照片仅在设备本地处理（系统文字识别能力），不会上传。
+1. 相机/相册：小票与菜单识别使用系统相机拍摄或相册选图，照片仅在设备本地处理（系统文字识别能力），不会上传；手动创建菜谱可选添加封面图，图片仅保存在本机应用目录。
 2. 位置信息（可选）：仅当您在设置页主动点击「定位」时，本应用读取一次当前位置，用于就近匹配城市、获取当地实时气温以修正新鲜度估算与时令推荐；坐标仅在本机使用，不写入日志、不上传服务器；您也可以随时改用手动选择城市。
 3. 通知：临期提醒使用系统本地通知，仅在您授权后发送，可在系统设置中关闭。
 4. 桌面卡片：显示您最近确认的菜单与临期食材摘要，数据来自本地。
@@ -38,49 +38,18 @@ const PRIVACY_TEXT: string = `更新日期：2026-10-20　版本：v1.9.0
 @Entry
 @Component
 struct Privacy {
-  @StorageProp('statusBarHeight') statusBarHeight: number = 0;
-  @State queriedBar: number = 0;
-
-  aboutToAppear(): void {
-    queryStatusBarHeight(getContext(this)).then((h: number): void => {
-      if (h > 0) {
-        this.queriedBar = h;
-      }
-    });
-  }
+  private scroller: Scroller = new Scroller();
 
   build() {
-    Column() {
-      Row() {
-        SymbolGlyph($r('sys.symbol.chevron_left'))
-          .fontSize(22)
-          .fontColor([$r('app.color.text_primary')])
-          .onClick((): void => {
-            router.back();
-          })
-        Text('隐私政策')
-          .fontSize(18).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-          .margin({ left: 8 })
-        Blank()
-      }
-      .width('100%')
-      .constraintSize({ minHeight: 44 })
-      .padding({ left: 12, right: 20, top: Math.max(Math.max(this.statusBarHeight, this.queriedBar), 36) })
-
-      Scroll() {
-        Text(PRIVACY_TEXT)
-          .fontSize(14)
-          .lineHeight(22)
-          .fontColor($r('app.color.text_secondary'))
-          .width('100%')
-          .padding({ left: 20, right: 20, top: 12, bottom: 40 })
-      }
-      .layoutWeight(1)
-      .width('100%')
-      .scrollBar(BarState.Auto)
+    Stack() {
+    FrostPage({ title: '隐私政策', scroller: this.scroller }) {
+      Text(PRIVACY_TEXT)
+        .fontSize(14)
+        .lineHeight(22)
+        .fontColor($r('app.color.text_secondary'))
+        .width('100%')
+        .padding({ left: 20, right: 20, top: 4 })
     }
-    .width('100%')
-    .height('100%')
-    .backgroundColor($r('app.color.page_background'))
+    }
   }
 }

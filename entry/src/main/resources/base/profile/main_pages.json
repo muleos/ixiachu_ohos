@@ -7,6 +7,7 @@
     "pages/StockManual",
     "pages/MenuScan",
     "pages/Settings",
-    "pages/Privacy"
+    "pages/Privacy",
+    "pages/RecipeManual"
   ]
 }
