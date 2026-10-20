@@ -96,6 +96,9 @@ struct MainTab {
       .vertical(false)
       .barPosition(BarPosition.End)
       .barHeight(TAB_BAR_HEIGHT)
+      // 底栏背景与遮罩全透明：默认灰底块会在悬浮胶囊后形成可见遮挡（真机实锤）
+      .barBackgroundColor(Color.Transparent)
+      .barBackgroundStyle({ maskColor: Color.Transparent })
       .barFloatingStyle({
         adaptToHandedness: true,
         barBottomMargin: 30,
