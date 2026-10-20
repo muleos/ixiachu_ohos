@@ -44,80 +44,82 @@ export struct ShoppingTab {
   }
 
   build() {
-    Column() {
-      Row() {
-        Text(this.priceHint())
-          .fontSize(12).fontColor($r('app.color.text_tertiary'))
-          .layoutWeight(1)
-        Text('清除已购')
-          .fontSize(13).fontColor($r('app.color.accent'))
-          .onClick((): void => {
-            DataStore.clearCheckedShopping();
-          })
+    // v1.9.0 沉浸光感：提示行并入列表首项，内容透出到标题栏后面
+    List({ scroller: this.pageScroller, space: 10 }) {
+      // 首项：避让 spacer + 菜价参考行（随内容滚走）
+      ListItem() {
+        Row() {
+          Text(this.priceHint())
+            .fontSize(12).fontColor($r('app.color.text_tertiary'))
+            .layoutWeight(1)
+          Text('清除已购')
+            .fontSize(13).fontColor($r('app.color.accent'))
+            .onClick((): void => {
+              DataStore.clearCheckedShopping();
+            })
+        }
+        .width('100%')
+        .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })
       }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 12 })
 
       if (this.items.length === 0) {
-        Column({ space: 10 }) {
-          Text('暂无采购清单').fontSize(16).fontColor($r('app.color.text_secondary'))
-          Text('在「点菜」生成菜单后，一键生成按人数折算的采购清单').fontSize(13).fontColor($r('app.color.text_tertiary'))
+        ListItem() {
+          Column({ space: 10 }) {
+            Text('暂无采购清单').fontSize(16).fontColor($r('app.color.text_secondary'))
+            Text('在「点菜」生成菜单后，一键生成按人数折算的采购清单').fontSize(13).fontColor($r('app.color.text_tertiary'))
+          }
+          .width('100%').padding({ top: 40 })
         }
-        .width('100%').padding({ top: 60 })
       } else {
-        List({ scroller: this.pageScroller, space: 10 }) {
-          ForEach(this.items, (item: ShoppingItem): void => {
-            ListItem() {
-              Row({ space: 12 }) {
-                Toggle({ type: ToggleType.Checkbox, isOn: item.checked })
-                  .selectedColor($r('app.color.accent'))
-                  .onChange((on: boolean): void => {
-                    item.checked = on;
-                    DataStore.setShopping(this.items);
-                  })
-                Column({ space: 3 }) {
-                  Row({ space: 8 }) {
-                    Text(item.name).fontSize(16)
-                      .fontColor(item.checked ? $r('app.color.text_tertiary') : $r('app.color.text_primary'))
-                      .decoration({ type: item.checked ? TextDecorationType.LineThrough : TextDecorationType.None })
-                    Text(item.category)
-                      .fontSize(10).fontColor($r('app.color.accent'))
-                      .backgroundColor($r('app.color.accent_soft'))
-                      .padding({ left: 6, right: 6, top: 1, bottom: 1 })
-                      .borderRadius(6)
-                  }
-                  Text(this.amountText(item))
-                    .fontSize(13).fontColor($r('app.color.text_secondary'))
+        ForEach(this.items, (item: ShoppingItem): void => {
+          ListItem() {
+            Row({ space: 12 }) {
+              Toggle({ type: ToggleType.Checkbox, isOn: item.checked })
+                .selectedColor($r('app.color.accent'))
+                .onChange((on: boolean): void => {
+                  item.checked = on;
+                  DataStore.setShopping(this.items);
+                })
+              Column({ space: 3 }) {
+                Row({ space: 8 }) {
+                  Text(item.name).fontSize(16)
+                    .fontColor(item.checked ? $r('app.color.text_tertiary') : $r('app.color.text_primary'))
+                    .decoration({ type: item.checked ? TextDecorationType.LineThrough : TextDecorationType.None })
+                  Text(item.category)
+                    .fontSize(10).fontColor($r('app.color.accent'))
+                    .backgroundColor($r('app.color.accent_soft'))
+                    .padding({ left: 6, right: 6, top: 1, bottom: 1 })
+                    .borderRadius(6)
                 }
-                .alignItems(HorizontalAlign.Start)
-                .layoutWeight(1)
-                Column({ space: 3 }) {
-                  // 预计花费（本次所需量 × 单价 ±15%）
-                  Text(`预计 ¥${item.priceLow} ~ ${item.priceHigh}`)
-                    .fontSize(14).fontColor($r('app.color.text_primary')).fontWeight(FontWeight.Medium)
-                  // 单价 + 所需量：250g 以上按千克显示
-                  if (item.pricePerKg > 0) {
-                    Text(`¥${item.pricePerKg}/kg × ${this.amountText(item)}`)
-                      .fontSize(11).fontColor($r('app.color.text_tertiary'))
-                  } else {
-                    Text('参考价').fontSize(11).fontColor($r('app.color.text_tertiary'))
-                  }
+                Text(this.amountText(item))
+                  .fontSize(13).fontColor($r('app.color.text_secondary'))
+              }
+              .alignItems(HorizontalAlign.Start)
+              .layoutWeight(1)
+              Column({ space: 3 }) {
+                // 预计花费（本次所需量 × 单价 ±15%）
+                Text(`预计 ¥${item.priceLow} ~ ${item.priceHigh}`)
+                  .fontSize(14).fontColor($r('app.color.text_primary')).fontWeight(FontWeight.Medium)
+                // 单价 + 所需量：250g 以上按千克显示
+                if (item.pricePerKg > 0) {
+                  Text(`¥${item.pricePerKg}/kg × ${this.amountText(item)}`)
+                    .fontSize(11).fontColor($r('app.color.text_tertiary'))
+                } else {
+                  Text('参考价').fontSize(11).fontColor($r('app.color.text_tertiary'))
                 }
               }
-              .width('100%')
-              .padding(14)
-              .borderRadius(14)
-              .backgroundColor($r('app.color.card_background'))
             }
-          }, (item: ShoppingItem): string => `${item.name}_${item.checked}_${this.shoppingRev}`)
-        }
-        .layoutWeight(1)
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 120 })
-        .edgeEffect(EdgeEffect.Spring)
+            .width('100%')
+            .padding(14)
+            .borderRadius(14)
+            .backgroundColor($r('app.color.card_background'))
+          }
+        }, (item: ShoppingItem): string => `${item.name}_${item.checked}_${this.shoppingRev}`)
       }
     }
     .width('100%')
     .height('100%')
+    .padding({ left: 16, right: 16, bottom: 120 })
+    .edgeEffect(EdgeEffect.Spring)
   }
 }

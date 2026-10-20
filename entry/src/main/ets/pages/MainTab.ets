@@ -4,13 +4,13 @@
  * 底栏：barHeight 56 / barBottomMargin 30 / IMMERSIVE 材质，选中色 = 品牌 accent。
  * 顶栏：IMMERSIVE_GRADIENT_BLUR 滚动光感，bindToScrollable 绑定各页滚动器。
  */
-import { LengthMetrics, SymbolGlyphModifier, mediaquery, router } from '@kit.ArkUI';
+import { SymbolGlyphModifier, mediaquery, router } from '@kit.ArkUI';
 import {
   HdsNavigation, HdsNavigationTitleMode, HdsTabs, HdsTabsController, HdsTabsModifier,
-  hdsMaterial, DividerShowType, ScrollEffectType, TitleBarStyleOptions
+  hdsMaterial, DividerShowType
 } from '@kit.UIDesignKit';
 import { common } from '@kit.AbilityKit';
-import { accentColor } from '../utils/Theme';
+import { accentColor, frostTitleStyle } from '../utils/Theme';
 import { DataStore } from '../service/DataStore';
 import { MenuLibraryTab } from './tabs/MenuLibraryTab';
 import { OrderTab } from './tabs/OrderTab';
@@ -107,45 +107,6 @@ struct MainTab {
     return '菜单库';
   }
 
-  private titleBarStyle(): TitleBarStyleOptions {
-    return {
-      scrollEffectOpts: {
-        enableScrollEffect: true,
-        scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR,
-        blurEffectiveStartOffset: LengthMetrics.vp(0),
-        blurEffectiveEndOffset: LengthMetrics.vp(16)
-      },
-      originalStyle: {
-        backgroundStyle: { backgroundColor: $r('sys.color.ohos_id_color_background_transparent') },
-        contentStyle: {
-          titleStyle: {
-            mainTitleColor: $r('app.color.text_primary'),
-            subTitleColor: $r('app.color.text_secondary')
-          },
-          backIconStyle: { iconColor: $r('app.color.text_primary') },
-          subIconStyle: { iconColor: $r('app.color.text_primary') },
-          menuStyle: { iconColor: $r('app.color.text_primary') }
-        }
-      },
-      scrollEffectStyle: {
-        backgroundStyle: { backgroundColor: $r('app.color.page_background') },
-        contentStyle: {
-          titleStyle: {
-            mainTitleColor: $r('app.color.text_primary'),
-            subTitleColor: $r('app.color.text_secondary')
-          },
-          backIconStyle: { iconColor: $r('app.color.text_primary') },
-          subIconStyle: { iconColor: $r('app.color.text_primary') },
-          menuStyle: { iconColor: $r('app.color.text_primary') }
-        }
-      },
-      systemMaterialEffect: {
-        materialType: hdsMaterial.MaterialType.IMMERSIVE,
-        materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-      }
-    };
-  }
-
   private hdsTabBar(icon: Resource, label: string): BottomTabBarStyle {
     const normalGlyph: SymbolGlyphModifier = new SymbolGlyphModifier(icon)
       .renderingStrategy(SymbolRenderingStrategy.SINGLE);
@@ -212,7 +173,7 @@ struct MainTab {
       })
     }
     .titleBar({
-      style: this.titleBarStyle(),
+      style: frostTitleStyle(),
       avoidLayoutSafeArea: true,
       content: {
         title: {
@@ -237,7 +198,7 @@ struct MainTab {
           Text('用户协议与隐私政策').fontSize(17).fontWeight(FontWeight.Bold)
             .fontColor($r('app.color.text_primary'))
           Scroll() {
-            Text('欢迎使用 I下厨。在开始使用前，请阅读并了解《隐私政策》：\n\n· 本应用不注册、不登录，不收集任何身份信息；\n· 菜谱、库存、采购清单等数据仅保存在您的设备本地；\n· 联网仅用于获取云端菜价参考与所选城市气温（只读请求，不含个人信息）；\n· 小票照片仅在本机识别，不上传；\n· 无广告、无第三方追踪。')
+            Text('欢迎使用 I下厨。在开始使用前，请阅读并了解《隐私政策》：\n\n· 本应用不注册、不登录，不收集任何身份信息；\n· 菜谱、库存、采购清单等数据仅保存在您的设备本地；\n· 联网仅用于获取云端菜价参考与当地气温（只读请求，不含个人信息）；\n· 仅在您主动点击「定位」时读取一次位置，用于就近匹配城市，坐标不上传；\n· 小票照片仅在本机识别，不上传；\n· 无广告、无第三方追踪。')
               .fontSize(13).lineHeight(21)
               .fontColor($r('app.color.text_secondary'))
               .width('100%')

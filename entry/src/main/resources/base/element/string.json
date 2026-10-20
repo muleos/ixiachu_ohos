@@ -35,6 +35,10 @@
     {
       "name": "form_menu_large_desc",
       "value": "今日菜单+临期食材提醒，分区点击直达"
+    },
+    {
+      "name": "reason_location",
+      "value": "用于获取您所在城市的实时气温，修正食材新鲜度估算与时令推荐；坐标仅在本地使用，不上传"
     }
   ]
 }

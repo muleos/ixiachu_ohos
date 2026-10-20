@@ -4,8 +4,9 @@
  * 此处提供 AppStorage 广播与少量动态取色工具，供 dock/玻璃层使用。
  */
 import { common } from '@kit.AbilityKit';
-import { window, display } from '@kit.ArkUI';
+import { window, display, LengthMetrics } from '@kit.ArkUI';
 import { hilog } from '@kit.PerformanceAnalysisKit';
+import { ScrollEffectType, TitleBarStyleOptions, HdsTitleBarContentStyle, hdsMaterial } from '@kit.UIDesignKit';
 
 const TAG: string = 'Theme';
 const DOMAIN: number = 0x1C9;
@@ -25,6 +26,44 @@ export const STATUS_BAR_FALLBACK: number = 36;
 /** 页内首行总避让高度（vp） */
 export function topAvoid(statusBarHeight: number): number {
   return Math.max(statusBarHeight, STATUS_BAR_FALLBACK) + NAV_TITLE_HEIGHT;
+}
+
+/**
+ * 沉浸光感标题栏样式（v1.9.0，VHome FrostScaffold 同款配方）：
+ * 未滚动全透明 + 滚动后 IMMERSIVE_GRADIENT_BLUR 渐变模糊采样 + 官方 IMMERSIVE 材质。
+ * 前提：页面滚动内容可透出到标题栏后面（首项 spacer 避让，随内容滚走）。
+ * 主框架与二级页（设置等）共用，深浅色走 $r 资源自适应。
+ */
+export function frostTitleStyle(): TitleBarStyleOptions {
+  const contentStyle: HdsTitleBarContentStyle = {
+    titleStyle: {
+      mainTitleColor: $r('app.color.text_primary'),
+      subTitleColor: $r('app.color.text_secondary')
+    },
+    backIconStyle: { iconColor: $r('app.color.text_primary') },
+    subIconStyle: { iconColor: $r('app.color.text_primary') },
+    menuStyle: { iconColor: $r('app.color.text_primary') }
+  };
+  return {
+    scrollEffectOpts: {
+      enableScrollEffect: true,
+      scrollEffectType: ScrollEffectType.IMMERSIVE_GRADIENT_BLUR,
+      blurEffectiveStartOffset: LengthMetrics.vp(0),
+      blurEffectiveEndOffset: LengthMetrics.vp(16)
+    },
+    originalStyle: {
+      backgroundStyle: { backgroundColor: Color.Transparent },
+      contentStyle: contentStyle
+    },
+    scrollEffectStyle: {
+      backgroundStyle: { backgroundColor: $r('app.color.page_background') },
+      contentStyle: contentStyle
+    },
+    systemMaterialEffect: {
+      materialType: hdsMaterial.MaterialType.IMMERSIVE,
+      materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+    }
+  };
 }
 
 /** 玻璃 dock 白玻璃描边（浅深通用半透明） */

@@ -31,62 +31,67 @@ export struct PantryTab {
 
   build() {
     Stack() {
-      Column() {
-        Row() {
-          Text(this.hintText())
-            .fontSize(12).fontColor(this.soonCount() > 0 ? $r('app.color.tag_orange') : $r('app.color.text_tertiary'))
-            .layoutWeight(1)
+      // v1.9.0 沉浸光感：操作行并入列表首项，内容透出到标题栏后面
+      List({ scroller: this.pageScroller, space: 10 }) {
+        // 首项：避让 spacer + 气温提示 / 操作按钮行
+        ListItem() {
+          Row() {
+            Text(this.hintText())
+              .fontSize(12).fontColor(this.soonCount() > 0 ? $r('app.color.tag_orange') : $r('app.color.text_tertiary'))
+              .layoutWeight(1)
+              .onClick((): void => {
+                this.showCity = !this.showCity;
+              })
+            Button() {
+              Row({ space: 6 }) {
+                SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(16).fontColor([$r('app.color.accent')])
+                Text('手动录入').fontSize(14).fontColor($r('app.color.accent'))
+              }
+            }
+            .backgroundColor($r('app.color.accent_soft'))
+            .height(36)
+            .borderRadius(18)
             .onClick((): void => {
-              this.showCity = !this.showCity;
+              router.pushUrl({ url: 'pages/StockManual' });
             })
-        Button() {
-          Row({ space: 6 }) {
-            SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(16).fontColor([$r('app.color.accent')])
-            Text('手动录入').fontSize(14).fontColor($r('app.color.accent'))
+            Button() {
+              Row({ space: 6 }) {
+                SymbolGlyph($r('sys.symbol.picture')).fontSize(16).fontColor([$r('app.color.accent')])
+                Text('拍小票入库').fontSize(14).fontColor($r('app.color.accent'))
+              }
+            }
+            .backgroundColor($r('app.color.accent_soft'))
+            .height(36)
+            .borderRadius(18)
+            .margin({ left: 10 })
+            .onClick((): void => {
+              router.pushUrl({ url: 'pages/ReceiptScan' });
+            })
+            Button() {
+              SymbolGlyph($r('sys.symbol.gearshape')).fontSize(17).fontColor([$r('app.color.text_secondary')])
+            }
+            .backgroundColor($r('app.color.accent_soft'))
+            .height(36)
+            .width(52)
+            .borderRadius(18)
+            .margin({ left: 10 })
+            .onClick((): void => {
+              router.pushUrl({ url: 'pages/Settings' });
+            })
           }
+          .width('100%')
+          .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })
         }
-        .backgroundColor($r('app.color.accent_soft'))
-        .height(36)
-        .borderRadius(18)
-        .onClick((): void => {
-          router.pushUrl({ url: 'pages/StockManual' });
-        })
-        Button() {
-          Row({ space: 6 }) {
-            SymbolGlyph($r('sys.symbol.picture')).fontSize(16).fontColor([$r('app.color.accent')])
-            Text('拍小票入库').fontSize(14).fontColor($r('app.color.accent'))
-          }
-        }
-        .backgroundColor($r('app.color.accent_soft'))
-        .height(36)
-        .borderRadius(18)
-        .margin({ left: 10 })
-        .onClick((): void => {
-          router.pushUrl({ url: 'pages/ReceiptScan' });
-        })
-        Button() {
-          SymbolGlyph($r('sys.symbol.gearshape')).fontSize(17).fontColor([$r('app.color.text_secondary')])
-        }
-        .backgroundColor($r('app.color.accent_soft'))
-        .height(36)
-        .width(52)
-        .borderRadius(18)
-        .margin({ left: 10 })
-        .onClick((): void => {
-          router.pushUrl({ url: 'pages/Settings' });
-        })
-      }
-      .width('100%')
-      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 12 })
 
-      if (this.stock.length === 0) {
-        Column({ space: 10 }) {
-          Text('冰箱空空如也').fontSize(16).fontColor($r('app.color.text_secondary'))
-          Text('拍摄购物小票，自动识别食材种类与数量入库').fontSize(13).fontColor($r('app.color.text_tertiary'))
-        }
-        .width('100%').padding({ top: 60 })
-      } else {
-        List({ scroller: this.pageScroller, space: 10 }) {
+        if (this.stock.length === 0) {
+          ListItem() {
+            Column({ space: 10 }) {
+              Text('冰箱空空如也').fontSize(16).fontColor($r('app.color.text_secondary'))
+              Text('拍摄购物小票，自动识别食材种类与数量入库').fontSize(13).fontColor($r('app.color.text_tertiary'))
+            }
+            .width('100%').padding({ top: 40 })
+          }
+        } else {
           ForEach(this.stock, (item: StockItem): void => {
             ListItem() {
               this.StockCard(item)
@@ -130,14 +135,12 @@ export struct PantryTab {
             }
           }
         }
-        .layoutWeight(1)
-        .width('100%')
-        .padding({ left: 16, right: 16, bottom: 120 })
-        .edgeEffect(EdgeEffect.Spring)
       }
-    }
-    .width('100%')
-    .height('100%')
+      .width('100%')
+      .height('100%')
+      .padding({ left: 16, right: 16, bottom: 120 })
+      .edgeEffect(EdgeEffect.Spring)
+      // 悬浮层（校准/城市弹层）仍在 Stack 内，Stack 于 build 尾部闭合
 
     // 校准弹层：全屏半透明遮罩 + 居中卡片；点遮罩关闭
     if (this.editing !== null) {
@@ -246,7 +249,9 @@ export struct PantryTab {
         // 阻断冒泡，避免点弹窗内容关闭
       })
     }
-  }
+    }
+    .width('100%')
+    .height('100%')
   }
 
   private reload(): void {

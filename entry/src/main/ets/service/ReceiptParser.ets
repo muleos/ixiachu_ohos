@@ -7,10 +7,24 @@
 import { image } from '@kit.ImageKit';
 import { picker, fileIo } from '@kit.CoreFileKit';
 import { common, Want } from '@kit.AbilityKit';
+import { hilog } from '@kit.PerformanceAnalysisKit';
 import textRecognition from '@hms.ai.ocr.textRecognition';
 import { lookupFood } from './NutritionDB';
 import { StockItem } from '../model/Models';
 import { DataStore } from './DataStore';
+
+const TAG: string = 'ReceiptParser';
+const DOMAIN: number = 0x1CA;
+
+/** 解码上限：宽 ≤1080 且高 ≤1920（小票为竖长图，宽高双限流内存峰值） */
+const DEC_CAP_W: number = 1080;
+const DEC_CAP_H: number = 1920;
+
+function sleepMs(ms: number): Promise<void> {
+  return new Promise<void>((resolve: () => void): void => {
+    setTimeout(resolve, ms);
+  });
+}
 
 export class ReceiptParser {
   /** 小票噪音行关键词：店头信息、金额栏头、结算/售后说明等，命中即整行跳过 */
@@ -263,6 +277,8 @@ export class ReceiptParser {
   /**
    * 拉起系统相机拍小票（Want imageCapture，零权限）。
    * 拍成返回照片路径，用户取消/失败返回空串。
+   * v1.9.0：返回后轮询校验「文件存在 + 体积稳定 + JPEG 魔数」，
+   * 系统相机落盘慢/半截文件直接进解码器是部分机型闪退根因。
    */
   static async captureReceipt(context: common.UIAbilityContext): Promise<string> {
     const path: string = `${context.cacheDir}/receipt_${Date.now()}.jpg`;
@@ -274,15 +290,48 @@ export class ReceiptParser {
     if (result.resultCode !== 0) {
       return '';
     }
-    // 相机返回时文件可能尚未完全落盘，稍候再读，避免截断 JPEG 触发解码异常
-    await new Promise<void>((resolve: () => void): void => {
-      setTimeout(resolve, 200);
-    });
+    // 落盘校验：最长等 2.4s，要求 JPEG 魔数(FF D8) 且体积两次采样一致（写完不再增长）
+    let lastSize: number = -1;
+    for (let i = 0; i < 8; i++) {
+      await sleepMs(300);
+      let size: number = 0;
+      try {
+        const st: fileIo.Stat = fileIo.statSync(path);
+        size = st.size;
+      } catch (e) {
+        continue; // 文件尚未创建
+      }
+      if (size > 2048 && size === lastSize && await ReceiptParser.isJpeg(path)) {
+        hilog.info(DOMAIN, TAG, 'capture ok size=%{public}d waits=%{public}d', size, i);
+        return path;
+      }
+      lastSize = size;
+    }
+    hilog.error(DOMAIN, TAG, 'capture file invalid or not settled');
+    return '';
+  }
+
+  /** 校验文件头是否为 JPEG（FF D8 FF），半截/写坏文件不进解码器 */
+  private static async isJpeg(path: string): Promise<boolean> {
+    let file: fileIo.File | null = null;
     try {
-      const st: fileIo.Stat = fileIo.statSync(path);
-      return st.size > 0 ? path : '';
+      file = fileIo.openSync(path, fileIo.OpenMode.READ_ONLY);
+      const buf: ArrayBuffer = new ArrayBuffer(3);
+      const readLen: number = fileIo.readSync(file.fd, buf);
+      if (readLen < 3) {
+        return false;
+      }
+      const bytes: Uint8Array = new Uint8Array(buf);
+      return bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF;
     } catch (e) {
-      return '';
+      return false;
+    } finally {
+      if (file !== null) {
+        try {
+          fileIo.closeSync(file);
+        } catch (e) {
+        }
+      }
     }
   }
 
@@ -300,38 +349,83 @@ export class ReceiptParser {
   }
 
   /**
-   * fd → （解码期等比降到 ≤1280 宽）→ OCR 文本。
-   * 不再「先全尺寸解码再 scale」——大图 scale 在部分设备会触发原生崩溃，
-   * 且全尺寸解码内存峰值高；改为 createPixelMap 时 desiredSize 直接降采样。
-   * 失败抛异常由调用方处理；资源在 finally 中释放。
+   * fd → （解码期限流降采样）→ OCR 文本。
+   * v1.9.0 加固：
+   * 1. 宽高双限流（≤1080×1920，取更严的等比系数）——此前只限宽，竖长小票高度无上限，
+   *    4:3 竖拍 3000×4000 降采样后仍 1080×1440 尚可，但 9:16 全屏竖拍 3000×5333 会得到
+   *    1080×1920 之上的峰值内存，部分机型在解码/OCR 原生层崩溃；
+   * 2. 解码失败自动降一档（720 宽）重试，而不是把原生异常抛给用户；
+   * 3. getImageInfo 失败不再中断（直接按上限解码）；
+   * 4. 全程 hilog 埋点，真机闪退可从日志定位到具体步骤。
    */
   private static async recognizeFd(fd: number): Promise<string> {
     let fileSource: image.ImageSource | null = null;
     let pixelMap: image.PixelMap | null = null;
     try {
+      hilog.info(DOMAIN, TAG, 'recognizeFd begin fd=%{public}d', fd);
       fileSource = await image.createImageSource(fd);
-      const srcInfo: image.ImageInfo = await fileSource.getImageInfo();
-      const w: number = srcInfo.size.width;
-      const opts: image.DecodingOptions = { };
-      if (w > 1280) {
-        const h: number = srcInfo.size.height;
-        opts.desiredSize = { width: 1280, height: Math.max(1, Math.round(h * 1280 / w)) };
+      let w: number = 0;
+      let h: number = 0;
+      try {
+        const srcInfo: image.ImageInfo = await fileSource.getImageInfo();
+        w = srcInfo.size.width;
+        h = srcInfo.size.height;
+      } catch (e) {
+        hilog.warn(DOMAIN, TAG, 'getImageInfo failed, decode with cap only');
       }
-      pixelMap = await fileSource.createPixelMap(opts);
+      // 候选降采样档位：先按原图算最严系数，失败降一档
+      const caps: number[][] = ReceiptParser.decodeSizes(w, h);
+      for (let i = 0; i < caps.length; i++) {
+        const opts: image.DecodingOptions = { desiredSize: { width: caps[i][0], height: caps[i][1] } };
+        try {
+          pixelMap = await fileSource.createPixelMap(opts);
+          hilog.info(DOMAIN, TAG, 'decoded %{public}dx%{public}d -> %{public}dx%{public}d (tier %{public}d)',
+            w, h, caps[i][0], caps[i][1], i);
+          break;
+        } catch (e) {
+          hilog.error(DOMAIN, TAG, 'createPixelMap tier %{public}d failed: %{public}s', i, (e as Error).message);
+          pixelMap = null;
+        }
+      }
+      if (pixelMap === null) {
+        throw new Error('图片解码失败，请重拍或换相册图片');
+      }
       if (!ReceiptParser.ocrInited) {
         await textRecognition.init();
         ReceiptParser.ocrInited = true;
       }
       const info: textRecognition.VisionInfo = { pixelMap: pixelMap };
       const data: textRecognition.TextRecognitionResult = await textRecognition.recognizeText(info);
+      hilog.info(DOMAIN, TAG, 'ocr ok len=%{public}d', data.value.length);
       return data.value;
     } finally {
       if (pixelMap !== null) {
-        pixelMap.release();
+        try {
+          pixelMap.release();
+        } catch (e) {
+        }
       }
       if (fileSource !== null) {
-        fileSource.release();
+        try {
+          fileSource.release();
+        } catch (e) {
+        }
       }
     }
+  }
+
+  /** 解码尺寸档位：把原图等比塞进 (1080×1920) 再塞进 (720×1280)；无原图信息时按上限直出 */
+  private static decodeSizes(w: number, h: number): number[][] {
+    const tiers: number[][] = [];
+    const fits: number[][] = [[DEC_CAP_W, DEC_CAP_H], [720, 1280]];
+    for (const cap of fits) {
+      if (w <= 0 || h <= 0) {
+        tiers.push([cap[0], Math.round(cap[0] * 4 / 3)]); // 无尺寸信息按 4:3 估
+        continue;
+      }
+      const scale: number = Math.min(cap[0] / w, cap[1] / h, 1);
+      tiers.push([Math.max(1, Math.round(w * scale)), Math.max(1, Math.round(h * scale))]);
+    }
+    return tiers;
   }
 }
