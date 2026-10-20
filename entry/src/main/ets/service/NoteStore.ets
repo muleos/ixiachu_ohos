@@ -4,7 +4,7 @@
  */
 import preferences from '@ohos.data.preferences';
 import { common } from '@kit.AbilityKit';
-import { NoteItem } from '../model/Models';
+import { NoteComment, NoteItem } from '../model/Models';
 
 const KEY: string = 'notes_json';
 
@@ -41,6 +41,15 @@ export class NoteStore {
           n.coverW = 4;
           n.coverH = 3;
         }
+        if (n.comments === undefined || n.comments === null) {
+          n.comments = [];
+        }
+        if (n.liked === undefined || n.liked === null) {
+          n.liked = false;
+        }
+        if (n.source === undefined || n.source === null) {
+          n.source = '本地';
+        }
       }
       NoteStore.notes = list.sort((a: NoteItem, b: NoteItem): number => b.time - a.time);
     } catch (e) {
@@ -75,6 +84,43 @@ export class NoteStore {
   static remove(id: string): void {
     NoteStore.notes = NoteStore.notes.filter((x: NoteItem): boolean => x.id !== id);
     NoteStore.persist();
+  }
+
+  /** 本地点赞切换 */
+  static toggleLike(id: string): boolean {
+    for (const n of NoteStore.notes) {
+      if (n.id === id) {
+        n.liked = !n.liked;
+        NoteStore.persist();
+        return n.liked;
+      }
+    }
+    return false;
+  }
+
+  /** 本地评论追加 */
+  static addComment(id: string, text: string): void {
+    const t: string = text.trim();
+    if (t.length === 0) {
+      return;
+    }
+    for (const n of NoteStore.notes) {
+      if (n.id === id) {
+        n.comments = n.comments.concat([new NoteComment(`c${Date.now()}`, t, Date.now())]);
+        NoteStore.persist();
+        return;
+      }
+    }
+  }
+
+  /** 评论数（卡片角标用） */
+  static commentCount(id: string): number {
+    for (const n of NoteStore.notes) {
+      if (n.id === id) {
+        return n.comments.length;
+      }
+    }
+    return 0;
   }
 
   private static persist(): void {

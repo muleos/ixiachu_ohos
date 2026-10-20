@@ -135,12 +135,20 @@ struct MainTab {
     return '菜单库';
   }
 
-  /** 笔记页右上角官方「发布」menu（其余页不占位） */
+  /** 笔记页右上角官方 menu：解析链接 + 发布（其余页不占位） */
   private notesMenu(): HdsNavigationMenuContentOptions | undefined {
     if (this.activeTab !== 1) {
       return undefined;
     }
-    const item: HdsNavigationMenuItemOptions = {
+    const importItem: HdsNavigationMenuItemOptions = {
+      content: {
+        icon: new SymbolGlyphModifier($r('sys.symbol.link')).fontColor([$r('app.color.text_primary')]),
+        action: (): void => {
+          router.pushUrl({ url: 'pages/NoteImport' });
+        }
+      }
+    };
+    const publishItem: HdsNavigationMenuItemOptions = {
       content: {
         icon: new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('app.color.text_primary')]),
         action: (): void => {
@@ -148,7 +156,7 @@ struct MainTab {
         }
       }
     };
-    return { value: [item] };
+    return { value: [importItem, publishItem] };
   }
 
   private hdsTabBar(icon: Resource, label: string): BottomTabBarStyle {

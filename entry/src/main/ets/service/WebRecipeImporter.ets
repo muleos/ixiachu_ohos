@@ -230,4 +230,126 @@ export class WebRecipeImporter {
       req.destroy();
     }
   }
+
+  /** 抓取小红书笔记页并按 INITIAL_STATE 通道解析 */
+  static async fetchXhs(url: string): Promise<WebPageContent> {
+    const req: http.HttpRequest = http.createHttp();
+    try {
+      const resp: http.HttpResponse = await req.request(url, {
+        method: http.RequestMethod.GET,
+        connectTimeout: 10000,
+        readTimeout: 15000,
+        header: { 'User-Agent': WebRecipeImporter.UA },
+        expectDataType: http.HttpDataType.STRING
+      });
+      if (resp.responseCode !== 200) {
+        const fail: WebPageContent = new WebPageContent();
+        fail.message = `小红书返回 ${resp.responseCode}，可稍后重试`;
+        return fail;
+      }
+      const html: string = typeof resp.result === 'string' ? resp.result : '';
+      return WebRecipeImporter.extractXhs(html);
+    } catch (e) {
+      const fail: WebPageContent = new WebPageContent();
+      fail.message = '小红书抓取失败，请检查网络';
+      return fail;
+    } finally {
+      req.destroy();
+    }
+  }
+
+  // ==================== 小红书专项（参考 collection_ohos） ====================
+
+  /** 是否小红书链接（xhslink 短链在 http 层自动跟随重定向落地） */
+  static isXhsUrl(url: string): boolean {
+    const u: string = url.toLowerCase();
+    return u.indexOf('xiaohongshu.com') >= 0 || u.indexOf('xhslink.com') >= 0;
+  }
+
+  /** 美食/做饭相关关键词（宽口径）：命中任一才允许加入笔记 */
+  private static readonly FOOD_KEYWORDS: string[] = [
+    '菜谱', '食谱', '做饭', '做菜', '烹饪', '厨房', '下厨', '家常菜', '美食',
+    '好吃', '吃', '菜', '饭', '汤', '餐', '烘焙', '料理', '食材', '调味',
+    '小吃', '早餐', '午餐', '晚餐', '夜宵', '宵夜', '减脂', '煲', '炖', '烧烤'
+  ];
+
+  /** 文案是否与美食/做饭相关（宽口径关键词命中） */
+  static isFoodRelated(text: string): boolean {
+    const t: string = text.toLowerCase();
+    for (const kw of WebRecipeImporter.FOOD_KEYWORDS) {
+      if (t.indexOf(kw) >= 0) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * 小红书笔记解析（简化版 collection_ohos XhsNoteParser）：
+   * 笔记内容在 window.__INITIAL_STATE__ 的 JSON 里——对反斜杠转义还原后的
+   * 原文按 "title"/"desc" 字段正则提取；图片兜底走全页媒体 URL 扫描
+   * （collection 的 legacy 通道同款）。
+   */
+  static extractXhs(html: string): WebPageContent {
+    const out: WebPageContent = new WebPageContent();
+    // JSON 内 URL 是 \/ 转义，先还原再扫描
+    const flat: string = html.replace(/\\\//g, '/');
+    const tm: RegExpMatchArray | null = flat.match(/"title":"((?:[^"\\]|\\.)*)"/);
+    if (tm !== null) {
+      out.title = WebRecipeImporter.decodeJsonString(tm[1]).trim();
+    }
+    const dm: RegExpMatchArray | null = flat.match(/"desc":"((?:[^"\\]|\\.)*)"/);
+    if (dm !== null) {
+      out.desc = WebRecipeImporter.decodeJsonString(dm[1]).trim();
+    }
+    if (out.title.length === 0) {
+      out.title = WebRecipeImporter.metaOf(html, ['og:title']);
+    }
+    if (out.desc.length === 0) {
+      out.desc = WebRecipeImporter.metaOf(html, ['og:description']);
+    }
+    // 图片：优先 sns-img CDN，再通用图片扩展名扫描（跳过头像/图标）
+    const urls: string[] = [];
+    const push = (u: string): void => {
+      if (u.length === 0 || urls.indexOf(u) >= 0 || urls.length >= 9) {
+        return;
+      }
+      const lower: string = u.toLowerCase();
+      if (lower.indexOf('avatar') >= 0 || lower.indexOf('icon') >= 0) {
+        return;
+      }
+      urls.push(u);
+    };
+    const snsRe: RegExp = /https:\/\/sns-img[^"'\s<>\\]+/g;
+    let m: RegExpExecArray | null = snsRe.exec(flat);
+    while (m !== null && urls.length < 9) {
+      push(m[0]);
+      m = snsRe.exec(flat);
+    }
+    const imgRe: RegExp =
+      /https?:\/\/[^\s"'<>\\]+?\.(?:jpg|jpeg|png|webp)(?:\?[^\s"'<>\\]*)?/gi;
+    m = imgRe.exec(flat);
+    while (m !== null && urls.length < 9) {
+      push(m[0]);
+      m = imgRe.exec(flat);
+    }
+    out.imageUrls = urls;
+    out.text = out.desc;
+    out.ok = out.title.length > 0 || out.desc.length > 0 || urls.length > 0;
+    if (!out.ok) {
+      out.message = '未能解析该小红书笔记（可能需要先在浏览器打开一次）';
+    }
+    return out;
+  }
+
+  /** JSON 字符串内容解码（\n \" \\ \/ \uXXXX） */
+  private static decodeJsonString(s: string): string {
+    return s
+      .replace(/\\n/g, '\n')
+      .replace(/\\"/g, '"')
+      .replace(/\\\//g, '/')
+      .replace(/\\\\/g, '\\')
+      .replace(/\\u([0-9a-fA-F]{4})/g, (m: string, p: string): string =>
+        String.fromCharCode(parseInt(p, 16)));
+  }
 }

@@ -12,6 +12,7 @@
     "pages/InspirationMystery",
     "pages/InspirationSeason",
     "pages/NotePublish",
-    "pages/NoteDetail"
+    "pages/NoteDetail",
+    "pages/NoteImport"
   ]
 }

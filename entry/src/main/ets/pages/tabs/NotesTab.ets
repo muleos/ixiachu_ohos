@@ -1,4 +1,4 @@
-/** 笔记 Tab（v1.12.0）—— 小红书式双列瀑布流：本地图文/视频/文字帖子，右上角发布 */
+/** 笔记 Tab（v1.12.1）—— 小红书式双列瀑布流：本地/解析的图文视频帖子，右上角发布与解析 */
 import { router } from '@kit.ArkUI';
 import { NoteItem } from '../../model/Models';
 import { NoteStore } from '../../service/NoteStore';
@@ -92,12 +92,20 @@ export struct NotesTab {
           .maxLines(3).textOverflow({ overflow: TextOverflow.Ellipsis })
           .width('100%')
       }
-      Row({ space: 6 }) {
+      Row({ space: 10 }) {
         Text(this.dateText(n))
           .fontSize(10).fontColor($r('app.color.text_tertiary'))
         Blank()
-        if (n.mediaPaths.length > 1) {
-          Text(`${n.mediaPaths.length} 图`).fontSize(10).fontColor($r('app.color.text_tertiary'))
+        // 本地点赞 / 评论数
+        Row({ space: 3 }) {
+          SymbolGlyph(n.liked ? $r('sys.symbol.heart_fill') : $r('sys.symbol.heart'))
+            .fontSize(12)
+            .fontColor(n.liked ? [$r('app.color.tag_red')] : [$r('app.color.text_tertiary')])
+          Text(n.liked ? '1' : '0').fontSize(10).fontColor($r('app.color.text_tertiary'))
+        }
+        Row({ space: 3 }) {
+          SymbolGlyph($r('sys.symbol.message')).fontSize(12).fontColor([$r('app.color.text_tertiary')])
+          Text(`${n.comments.length}`).fontSize(10).fontColor($r('app.color.text_tertiary'))
         }
       }
       .width('100%')

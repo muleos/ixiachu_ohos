@@ -169,6 +169,19 @@ export enum FreshLevel {
   CHECK = 2
 }
 
+/** 笔记评论（本地） */
+export class NoteComment {
+  id: string = '';
+  text: string = '';
+  time: number = 0;
+
+  constructor(id: string, text: string, time: number) {
+    this.id = id;
+    this.text = text;
+    this.time = time;
+  }
+}
+
 /** 做菜笔记（v1.12.0）：本地图文/视频/文字帖子，瀑布流展示 */
 export class NoteItem {
   id: string = '';
@@ -183,4 +196,10 @@ export class NoteItem {
   coverH: number = 3;
   /** 发布时间（毫秒） */
   time: number = 0;
+  /** 本地点赞 */
+  liked: boolean = false;
+  /** 本地评论 */
+  comments: NoteComment[] = [];
+  /** 来源（本地/网页解析，展示用） */
+  source: string = '本地';
 }
