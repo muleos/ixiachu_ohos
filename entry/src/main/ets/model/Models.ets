@@ -168,3 +168,19 @@ export enum FreshLevel {
   SOON = 1,
   CHECK = 2
 }
+
+/** 做菜笔记（v1.12.0）：本地图文/视频/文字帖子，瀑布流展示 */
+export class NoteItem {
+  id: string = '';
+  /** 文字内容 */
+  text: string = '';
+  /** 图片本地路径列表（最多 9 张） */
+  mediaPaths: string[] = [];
+  /** 视频本地路径（与图片互斥使用） */
+  videoPath: string = '';
+  /** 首图宽高比（瀑布流卡片高度用，默认 4:3） */
+  coverW: number = 4;
+  coverH: number = 3;
+  /** 发布时间（毫秒） */
+  time: number = 0;
+}

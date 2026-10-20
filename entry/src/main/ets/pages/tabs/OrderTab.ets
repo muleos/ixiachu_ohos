@@ -1,9 +1,15 @@
-/** 功能二：点菜 —— 搜索 / 人数随机 / 需求推荐 / 一键生成采购清单 */
-import { promptAction } from '@kit.ArkUI';
-import { DailyMenu, FreshLevel, Recipe, ShoppingItem, StockItem } from '../../model/Models';
+/**
+ * 功能二：点菜（v1.12.0 合并版）——
+ * 灵感区（盲盒抽卡 / 二十四节气时令）+ 点菜区（随机点菜与按需求推荐合并为
+ * 一张卡：人数/热量上限/餐标预算/时令优先/优先消耗库存，填了条件走推荐、
+ * 全空走随机，功能全保留）+ 今日菜单结果卡。
+ */
+import { router, promptAction } from '@kit.ArkUI';
+import { DailyMenu, FreshLevel, ShoppingItem, StockItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { MenuPlanner } from '../../service/MenuPlanner';
 import { Freshness } from '../../service/Freshness';
+import { InspirationData } from '../../service/InspirationData';
 import { topAvoid } from '../../utils/Theme';
 import { WidgetSync } from '../../service/WidgetSync';
 
@@ -12,7 +18,6 @@ export struct OrderTab {
   pageScroller: Scroller = new Scroller();
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
   @StorageProp('dataRev') dataRev: number = 0;
-  @State keyword: string = '';
   @State people: number = 3;
   @State maxKcal: number = 0;
   @State budget: number = 0;
@@ -21,7 +26,7 @@ export struct OrderTab {
   @State menu: DailyMenu | null = null;
 
   aboutToAppear(): void {
-    // 有临期食材时自动开启「优先消耗库存」（默认本就开启，这里兜底显式置位）
+    // 有临期食材时自动开启「优先消耗库存」
     if (this.urgentCount() > 0) {
       this.useStock = true;
     }
@@ -34,44 +39,116 @@ export struct OrderTab {
       Freshness.level(Freshness.decayRatioSync(s, now, Freshness.monthFactor(now))) >= FreshLevel.SOON).length;
   }
 
+  /** 生成菜单：填了任一推荐条件走按需求推荐，否则纯随机 */
+  private generate(): void {
+    const hasRequirement: boolean = this.maxKcal > 0 || this.budget > 0 || this.seasonal;
+    if (hasRequirement) {
+      this.menu = MenuPlanner.recommend(this.people, this.maxKcal, this.budget, this.seasonal, this.useStock);
+    } else {
+      this.menu = MenuPlanner.randomMenu(this.people);
+    }
+    DataStore.addMenu(this.menu);
+  }
+
   build() {
     Scroll(this.pageScroller) {
       Column({ space: 14 }) {
-        // 搜索菜单库
-        Row() {
-          SymbolGlyph($r('sys.symbol.magnifyingglass')).fontSize(16).fontColor([$r('app.color.text_tertiary')])
-          TextInput({ placeholder: '搜索菜单库中的菜名', text: this.keyword })
-            .backgroundColor(Color.Transparent).border({ width: 0 })
-            .fontColor($r('app.color.text_primary'))
-            .placeholderColor($r('app.color.text_tertiary'))
-            .layoutWeight(1)
-            .onChange((v: string): void => {
-              this.keyword = v;
-            })
-        }
-        .width('100%').height(40).padding({ left: 14, right: 14 })
-        .borderRadius(20).backgroundColor($r('app.color.card_background'))
-
-        // 搜索结果
-        if (this.keyword.length > 0) {
-          ForEach(MenuPlanner.search(this.keyword), (r: Recipe): void => {
-            Row() {
-              Text(r.name).fontSize(15).fontColor($r('app.color.text_primary'))
-              Blank()
-              Text(`约 ${r.nutrition.kcal} kcal`).fontSize(12).fontColor($r('app.color.text_tertiary'))
+        // ① 灵感盲盒 · 今天吃什么
+        Row({ space: 12 }) {
+          Column({ space: 6 }) {
+            Row({ space: 6 }) {
+              Text('✦ 灵感盲盒').fontSize(11).fontColor(Color.White)
+                .backgroundColor($r('app.color.accent'))
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .borderRadius(10)
+              Text('摇一摇抽卡').fontSize(11).fontColor($r('app.color.text_tertiary'))
             }
-            .width('100%').padding(14).borderRadius(12)
-            .backgroundColor($r('app.color.card_background'))
-          }, (r: Recipe): string => r.id)
-        }
+            .width('100%')
+            Text('今天吃什么').fontSize(19).fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.text_primary')).width('100%')
+            Text('纠结这一餐？抽一张私房风味签')
+              .fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
 
-        // 随机点菜
+          Column({ space: 6 }) {
+            SymbolGlyph($r('sys.symbol.gift'))
+              .fontSize(24).fontColor([Color.White])
+            Text('盲盒').fontSize(10).fontColor(Color.White)
+          }
+          .width(78)
+          .height(92)
+          .justifyContent(FlexAlign.Center)
+          .borderRadius(14)
+          .linearGradient({
+            angle: 160,
+            colors: [['#F08A3C', 0], ['#ED6D3D', 1]]
+          })
+          .shadow({ radius: 12, color: '#33ED6D3D', offsetY: 4 })
+        }
+        .width('100%')
+        .padding(16)
+        .borderRadius(18)
+        .backgroundColor($r('app.color.card_background'))
+        .onClick((): void => {
+          router.pushUrl({ url: 'pages/InspirationMystery' });
+        })
+
+        // ② 二十四节气 · 时令推荐
+        Row({ space: 12 }) {
+          Column({ space: 6 }) {
+            Row({ space: 6 }) {
+              Text('❋ 二十四节气').fontSize(11).fontColor($r('app.color.accent'))
+                .backgroundColor($r('app.color.accent_soft'))
+                .padding({ left: 8, right: 8, top: 3, bottom: 3 })
+                .borderRadius(10)
+              Text(`${InspirationData.seasonOf(new Date()).term} · 当令`).fontSize(11)
+                .fontColor($r('app.color.text_tertiary'))
+            }
+            .width('100%')
+            Text('时令推荐').fontSize(19).fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.text_primary')).width('100%')
+            Text(InspirationData.seasonOf(new Date()).desc)
+              .fontSize(12).fontColor($r('app.color.text_secondary'))
+              .maxLines(2).textOverflow({ overflow: TextOverflow.Ellipsis }).width('100%')
+            Text(`探索 ${InspirationData.seasonOf(new Date()).matchCount()} 道好味 ›`)
+              .fontSize(12).fontColor($r('app.color.accent'))
+          }
+          .alignItems(HorizontalAlign.Start)
+          .layoutWeight(1)
+
+          Column({ space: 4 }) {
+            Text(InspirationData.seasonOf(new Date()).key).fontSize(26).fontWeight(FontWeight.Bold)
+              .fontColor($r('app.color.accent'))
+            Text(`${InspirationData.seasonOf(new Date()).term} · ${InspirationData.seasonOf(new Date()).sub}`)
+              .fontSize(9).fontColor($r('app.color.text_secondary'))
+          }
+          .width(78)
+          .height(92)
+          .justifyContent(FlexAlign.Center)
+          .borderRadius(14)
+          .backgroundColor($r('app.color.accent_soft'))
+        }
+        .width('100%')
+        .padding(16)
+        .borderRadius(18)
+        .backgroundColor($r('app.color.card_background'))
+        .onClick((): void => {
+          router.pushUrl({ url: 'pages/InspirationSeason' });
+        })
+
+        // ③ 开始点菜（随机 + 按需求 合并卡）
         Column({ space: 12 }) {
           Row({ space: 8 }) {
             SymbolGlyph($r('sys.symbol.shuffle')).fontSize(16).fontColor([$r('app.color.accent')])
-            Text('随机点菜').fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+            Text('开始点菜').fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+            Blank()
+            Text('填条件=按需求 · 全空=随机')
+              .fontSize(10).fontColor($r('app.color.text_tertiary'))
           }
           .width('100%')
+
           Row({ space: 12 }) {
             Text('用餐人数').fontSize(14).fontColor($r('app.color.text_secondary'))
             Blank()
@@ -86,28 +163,10 @@ export struct OrderTab {
             })
           }
           .width('100%')
-          Button('随机生成菜单')
-            .width('100%').height(44).borderRadius(22)
-            .backgroundColor($r('app.color.accent'))
-            .fontColor(Color.White)
-            .onClick((): void => {
-              this.menu = MenuPlanner.randomMenu(this.people);
-              DataStore.addMenu(this.menu);
-            })
-        }
-        .width('100%').padding(16).borderRadius(16)
-        .backgroundColor($r('app.color.card_background'))
 
-        // 需求推荐
-        Column({ space: 12 }) {
-          Row({ space: 8 }) {
-            SymbolGlyph($r('sys.symbol.dart_target')).fontSize(16).fontColor([$r('app.color.accent')])
-            Text('按需求推荐').fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-          }
-          .width('100%')
           Row({ space: 12 }) {
             Text('热量上限').fontSize(14).fontColor($r('app.color.text_secondary'))
-            TextInput({ placeholder: 'kcal/人（可空）' })
+            TextInput({ placeholder: 'kcal/人（选填）' })
               .type(InputType.NUMBER_DECIMAL)
               .height(36).fontSize(14)
               .fontColor($r('app.color.text_primary'))
@@ -120,9 +179,10 @@ export struct OrderTab {
               })
           }
           .width('100%')
+
           Row({ space: 12 }) {
             Text('餐标预算').fontSize(14).fontColor($r('app.color.text_secondary'))
-            TextInput({ placeholder: '元（可空）' })
+            TextInput({ placeholder: '元（选填）' })
               .type(InputType.NUMBER_DECIMAL)
               .height(36).fontSize(14)
               .fontColor($r('app.color.text_primary'))
@@ -135,6 +195,7 @@ export struct OrderTab {
               })
           }
           .width('100%')
+
           Row({ space: 24 }) {
             Row({ space: 6 }) {
               Toggle({ type: ToggleType.Checkbox, isOn: this.seasonal })
@@ -158,19 +219,19 @@ export struct OrderTab {
             }
           }
           .width('100%')
-          Button('生成推荐菜单')
+
+          Button('生成菜单')
             .width('100%').height(44).borderRadius(22)
             .backgroundColor($r('app.color.accent'))
             .fontColor(Color.White)
             .onClick((): void => {
-              this.menu = MenuPlanner.recommend(this.people, this.maxKcal, this.budget, this.seasonal, this.useStock);
-              DataStore.addMenu(this.menu);
+              this.generate();
             })
         }
         .width('100%').padding(16).borderRadius(16)
         .backgroundColor($r('app.color.card_background'))
 
-        // 点菜结果
+        // ④ 点菜结果
         if (this.menu !== null && (this.menu as DailyMenu).recipeNames.length > 0) {
           Column({ space: 10 }) {
             Row() {

@@ -7,13 +7,13 @@
 import { SymbolGlyphModifier, mediaquery, router } from '@kit.ArkUI';
 import {
   HdsNavigation, HdsNavigationTitleMode, HdsTabs, HdsTabsController, HdsTabsModifier,
-  hdsMaterial, DividerShowType
+  hdsMaterial, DividerShowType, HdsNavigationMenuContentOptions, HdsNavigationMenuItemOptions
 } from '@kit.UIDesignKit';
 import { common } from '@kit.AbilityKit';
 import { accentColor, frostTitleStyle } from '../utils/Theme';
 import { DataStore } from '../service/DataStore';
 import { MenuLibraryTab } from './tabs/MenuLibraryTab';
-import { InspirationTab } from './tabs/InspirationTab';
+import { NotesTab } from './tabs/NotesTab';
 import { OrderTab } from './tabs/OrderTab';
 import { ShoppingTab } from './tabs/ShoppingTab';
 import { PantryTab } from './tabs/PantryTab';
@@ -34,7 +34,7 @@ class TabDef {
 
 const TABS: TabDef[] = [
   new TabDef(0, '菜单库', $r('sys.symbol.doc_text')),
-  new TabDef(1, '灵感', $r('sys.symbol.lightbulb')),
+  new TabDef(1, '笔记', $r('sys.symbol.grid')),
   new TabDef(2, '点菜', $r('sys.symbol.list_bullet_square')),
   new TabDef(3, '采购', $r('sys.symbol.bag')),
   new TabDef(4, '食材', $r('sys.symbol.folder'))
@@ -121,7 +121,7 @@ struct MainTab {
 
   private currentTitle(): string {
     if (this.activeTab === 1) {
-      return '灵感';
+      return '笔记';
     }
     if (this.activeTab === 2) {
       return '点菜';
@@ -133,6 +133,22 @@ struct MainTab {
       return '食材管理';
     }
     return '菜单库';
+  }
+
+  /** 笔记页右上角官方「发布」menu（其余页不占位） */
+  private notesMenu(): HdsNavigationMenuContentOptions | undefined {
+    if (this.activeTab !== 1) {
+      return undefined;
+    }
+    const item: HdsNavigationMenuItemOptions = {
+      content: {
+        icon: new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('app.color.text_primary')]),
+        action: (): void => {
+          router.pushUrl({ url: 'pages/NotePublish' });
+        }
+      }
+    };
+    return { value: [item] };
   }
 
   private hdsTabBar(icon: Resource, label: string): BottomTabBarStyle {
@@ -160,7 +176,7 @@ struct MainTab {
         .tabBar(this.hdsTabBar(TABS[0].icon, TABS[0].label))
 
         TabContent() {
-          InspirationTab({ pageScroller: this.inspirationScroller })
+          NotesTab({ pageScroller: this.inspirationScroller })
         }
         .tabBar(this.hdsTabBar(TABS[1].icon, TABS[1].label))
 
@@ -199,6 +215,7 @@ struct MainTab {
         title: {
           mainTitle: this.currentTitle()
         },
+        menu: this.notesMenu(),
         divider: { showType: DividerShowType.OFF }
       }
     })

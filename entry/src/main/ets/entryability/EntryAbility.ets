@@ -10,6 +10,7 @@ import { applyTheme, publishInsets } from '../utils/Theme';
 import { CrashLog } from '../utils/CrashLog';
 import { DataStore } from '../service/DataStore';
 import { SeedService } from '../service/SeedService';
+import { NoteStore } from '../service/NoteStore';
 import { PriceSync } from '../service/PriceSync';
 import { Notify } from '../service/Notify';
 
@@ -61,6 +62,7 @@ export default class EntryAbility extends UIAbility {
     // 首帧默认浅色；深浅色切换由 onConfigurationUpdate 统一接管
     // 数据仓库初始化必须先于首帧：v1.2.2 起 init 无人调用导致持久化失效（历史 P0），此处串入启动链
     DataStore.init(this.context).then((): void => {
+      NoteStore.init(this.context);
       this.syncTheme();
       windowStage.loadContent('pages/MainTab', (err): void => {
         if (err.code) {
