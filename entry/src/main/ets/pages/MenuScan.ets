@@ -87,7 +87,7 @@ struct MenuScan {
 
       Button('识别并加入菜单库')
         .width('calc(100% - 40vp)')
-        .height(46).borderRadius(23).margin({ bottom: 20 })
+        .height(46).borderRadius(23).margin({ bottom: 36 })
         .backgroundColor($r('app.color.accent'))
         .fontColor(Color.White)
         .onClick((): void => {

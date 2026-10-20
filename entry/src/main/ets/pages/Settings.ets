@@ -13,12 +13,14 @@ import { DataStore } from '../service/DataStore';
 import { Notify } from '../service/Notify';
 import { Weather, City } from '../service/Weather';
 import { LocationService, LocateResult } from '../service/LocationService';
-import { frostTitleStyle, topAvoid } from '../utils/Theme';
+import { frostTitleStyle, topAvoid, queryStatusBarHeight } from '../utils/Theme';
 
 @Entry
 @Component
 struct Settings {
   @StorageProp('statusBarHeight') statusBarHeight: number = 0;
+  /** 页面挂载时直查窗口避让区（广播滞后/失败时的自查兜底，v1.2.2 同款） */
+  @State queriedBar: number = 0;
   /** 主滚动容器（官方光感滚动源绑定） */
   private scroller: Scroller = new Scroller();
   @State notifyOn: boolean = Notify.enabled();
@@ -33,6 +35,16 @@ struct Settings {
 
   aboutToAppear(): void {
     this.loadVersion();
+    queryStatusBarHeight(getContext(this)).then((h: number): void => {
+      if (h > 0) {
+        this.queriedBar = h;
+      }
+    });
+  }
+
+  /** 状态栏高度：广播/窗口直查取大者，36vp 兜底 */
+  private topInset(): number {
+    return Math.max(Math.max(this.statusBarHeight, this.queriedBar), 36);
   }
 
   private loadVersion(): void {
@@ -50,7 +62,7 @@ struct Settings {
         Scroll(this.scroller) {
           Column({ space: 14 }) {
             // 首项避让 spacer：随内容滚走，内容透出到标题栏后面（光感采样）
-            Column().width('100%').padding({ top: topAvoid(this.statusBarHeight) + 8 })
+            Column().width('100%').padding({ top: topAvoid(this.topInset()) + 12 })
 
             // 临期提醒
             Column({ space: 4 }) {
@@ -144,11 +156,11 @@ struct Settings {
             .width('100%').padding(16).borderRadius(16)
             .backgroundColor($r('app.color.card_background'))
 
-            // 尾部留白（悬浮层之下不被裁剪）
-            Column().height(20).width('100%')
+            // 尾部留白：避让小白条手势区（底部沉浸直达屏幕底）
+            Column().height(56).width('100%')
           }
           .width('100%')
-          .padding({ left: 20, right: 20, bottom: 40 })
+          .padding({ left: 20, right: 20, bottom: 20 })
         }
         .scrollBar(BarState.Off)
         .width('100%')

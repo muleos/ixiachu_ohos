@@ -138,7 +138,7 @@ export struct PantryTab {
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 16, right: 16, bottom: 120 })
+      .padding({ left: 16, right: 16, bottom: 132 })
       .edgeEffect(EdgeEffect.Spring)
       // 悬浮层（校准/城市弹层）仍在 Stack 内，Stack 于 build 尾部闭合
 

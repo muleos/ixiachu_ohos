@@ -244,7 +244,7 @@ export struct OrderTab {
         }
       }
       .width('100%')
-      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 120 })
+      .padding({ left: 16, right: 16, top: topAvoid(this.statusBarHeight) + 8, bottom: 132 })
     }
     .layoutWeight(1)
     .scrollBar(BarState.Off)

@@ -168,7 +168,7 @@ struct ReceiptScan {
 
       Button(`确认入库（${this.items.length} 项）`)
         .width('calc(100% - 40vp)')
-        .height(46).borderRadius(23).margin({ bottom: 20 })
+        .height(46).borderRadius(23).margin({ bottom: 36 })
         .backgroundColor($r('app.color.accent'))
         .fontColor(Color.White)
         .onClick((): void => {
