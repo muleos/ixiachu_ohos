@@ -36,8 +36,8 @@ struct RecipeDetail {
       }
     }) {
       Column({ space: 16 }) {
-        // 封面图（手动创建选填）
-        if ((this.recipe() as Recipe).cover.length > 0) {
+        // 封面图（手动创建选填；旧数据 cover 可能缺失，兜底空串）
+        if (((this.recipe() as Recipe).cover ?? '').length > 0) {
           Image(`file://${(this.recipe() as Recipe).cover}`)
             .width('100%')
             .height(200)

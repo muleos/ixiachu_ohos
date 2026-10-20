@@ -127,7 +127,36 @@ export class DataStore {
   private static loadRecipes(): Recipe[] {
     try {
       const raw: string = (DataStore.store as preferences.Preferences).getSync(KEY_RECIPES, '') as string;
-      return raw.length === 0 ? [] : JSON.parse(raw) as Recipe[];
+      if (raw.length === 0) {
+        return [];
+      }
+      const list: Recipe[] = JSON.parse(raw) as Recipe[];
+      // 存量数据补默认字段：v1.10.0 新增 cover，旧 JSON 缺失为 undefined，
+      // 详情页直接读 .cover.length 会闪退（真机已实锤）——统一归一为实例默认值
+      for (const r of list) {
+        if (r === undefined || r === null) {
+          continue;
+        }
+        if (r.cover === undefined || r.cover === null) {
+          r.cover = '';
+        }
+        if (r.tip === undefined || r.tip === null) {
+          r.tip = '';
+        }
+        if (r.grade === undefined || r.grade === null) {
+          r.grade = '';
+        }
+        if (r.tags === undefined || r.tags === null) {
+          r.tags = [];
+        }
+        if (r.ingredients === undefined || r.ingredients === null) {
+          r.ingredients = [];
+        }
+        if (r.steps === undefined || r.steps === null) {
+          r.steps = [];
+        }
+      }
+      return list;
     } catch (e) {
       return [];
     }

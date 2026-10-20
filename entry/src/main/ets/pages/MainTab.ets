@@ -1,14 +1,12 @@
 /**
- * I下厨 主框架 —— 与 CoolapkPura 同款官方槽位：
- * HdsNavigation 顶栏（沉浸光感渐变模糊）+ HdsTabs 悬浮胶囊底栏（barFloatingStyle）。
- * 底栏：barHeight 56 / barBottomMargin 30 / IMMERSIVE 材质，选中色 = 品牌 accent。
- * 顶栏：IMMERSIVE_GRADIENT_BLUR 滚动光感，bindToScrollable 绑定各页滚动器。
+ * I下厨 主框架（v1.10.2）：
+ * 顶栏：HdsNavigation 沉浸光感渐变模糊（IMMERSIVE_GRADIENT_BLUR，bindToScrollable 绑定各页滚动器）。
+ * 底栏：VHome 同款自建悬浮玻璃 dock（真模糊 BlurStyle.Regular + 白/墨蓝玻璃底 + 描边投影），
+ *       内容延伸到 dock 后面穿透采样——官方 HdsTabs 悬浮岛材质真机偏实底，沉浸感不足，故换回自绘。
+ * 避让：四 Tab 列表底部留白 132vp（dock 占位 24 + 56 = 80vp 之上留足余量）。
  */
-import { SymbolGlyphModifier, mediaquery, router } from '@kit.ArkUI';
-import {
-  HdsNavigation, HdsNavigationTitleMode, HdsTabs, HdsTabsController, HdsTabsModifier,
-  hdsMaterial, DividerShowType
-} from '@kit.UIDesignKit';
+import { mediaquery, router } from '@kit.ArkUI';
+import { HdsNavigation, HdsNavigationTitleMode, DividerShowType } from '@kit.UIDesignKit';
 import { common } from '@kit.AbilityKit';
 import { accentColor, frostTitleStyle } from '../utils/Theme';
 import { DataStore } from '../service/DataStore';
@@ -17,19 +15,41 @@ import { OrderTab } from './tabs/OrderTab';
 import { ShoppingTab } from './tabs/ShoppingTab';
 import { PantryTab } from './tabs/PantryTab';
 
-const TAB_BAR_HEIGHT: number = 56;
+/** 玻璃 dock 几何（VHome dockFrost 同款） */
+const DOCK_HEIGHT: number = 56;
+const DOCK_BOTTOM_MARGIN: number = 24;
+
+class TabDef {
+  index: number = 0;
+  label: string = '';
+  icon: Resource = $r('sys.symbol.doc_text');
+
+  constructor(index: number, label: string, icon: Resource) {
+    this.index = index;
+    this.label = label;
+    this.icon = icon;
+  }
+}
+
+const TABS: TabDef[] = [
+  new TabDef(0, '菜单库', $r('sys.symbol.doc_text')),
+  new TabDef(1, '点菜', $r('sys.symbol.list_bullet_square')),
+  new TabDef(2, '采购', $r('sys.symbol.bag')),
+  new TabDef(3, '食材', $r('sys.symbol.folder'))
+];
 
 @Entry
 @Component
 struct MainTab {
-  @StorageProp('isDarkMode') @Watch('onThemeChanged') isDark: boolean = false;
+  @StorageProp('isDarkMode') isDark: boolean = false;
   /** 通知点击透传的目标 Tab（launchTab>=0 时切换；onNewWant 热启动也会触发本 Watch） */
   @StorageProp('launchTab') @Watch('onLaunchTab') launchTab: number = -1;
   @State activeTab: number = 0;
+  /** dock 按压态（UX 规范：按下变淡） */
+  @State pressedIndex: number = -1;
   /** 首启隐私同意（AGC 审核 4.1：未同意前遮罩阻断使用） */
   @State showPrivacy: boolean = DataStore.getSetting('privacy_agreed') !== '1';
-  @State hdsTabsModifier: HdsTabsModifier = new HdsTabsModifier();
-  private hdsTabsController: HdsTabsController = new HdsTabsController();
+  private tabsController: TabsController = new TabsController();
   private libraryScroller: Scroller = new Scroller();
   private orderScroller: Scroller = new Scroller();
   private shoppingScroller: Scroller = new Scroller();
@@ -37,7 +57,6 @@ struct MainTab {
   private mqListener: mediaquery.MediaQueryListener | null = null;
 
   aboutToAppear(): void {
-    this.configureHdsTabs();
     // 冷启动通知透传：直接落在目标 Tab
     const tab: number = AppStorage.get<number>('launchTab') ?? -1;
     if (tab >= 0) {
@@ -63,29 +82,6 @@ struct MainTab {
     }
   }
 
-  /** 深浅色切换：modifier 持有颜色，必须整体换新 */
-  private onThemeChanged(): void {
-    this.configureHdsTabs();
-  }
-
-  private configureHdsTabs(): void {
-    const modifier: HdsTabsModifier = new HdsTabsModifier();
-    modifier
-      .vertical(false)
-      .barPosition(BarPosition.End)
-      .barHeight(TAB_BAR_HEIGHT)
-      .barFloatingStyle({
-        adaptToHandedness: true,
-        barBottomMargin: 30,
-        lightColor: accentColor(),
-        systemMaterialEffect: {
-          materialType: hdsMaterial.MaterialType.IMMERSIVE,
-          materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
-        }
-      });
-    this.hdsTabsModifier = modifier;
-  }
-
   /** 热启动点通知：AppStorage.launchTab 变化 → 切页 */
   onLaunchTab(): void {
     if (this.launchTab >= 0) {
@@ -107,65 +103,88 @@ struct MainTab {
     return '菜单库';
   }
 
-  private hdsTabBar(icon: Resource, label: string): BottomTabBarStyle {
-    const normalGlyph: SymbolGlyphModifier = new SymbolGlyphModifier(icon)
-      .renderingStrategy(SymbolRenderingStrategy.SINGLE);
-    normalGlyph.fontColor([$r('app.color.text_secondary')]);
-    const selectedGlyph: SymbolGlyphModifier = new SymbolGlyphModifier(icon)
-      .renderingStrategy(SymbolRenderingStrategy.SINGLE);
-    selectedGlyph.fontColor([accentColor()]);
-    return BottomTabBarStyle.of({ normal: normalGlyph, selected: selectedGlyph }, label)
-      .labelStyle({
-        unselectedColor: $r('app.color.text_secondary'),
-        selectedColor: accentColor()
+  @Builder
+  dockItems() {
+    ForEach(TABS, (t: TabDef): void => {
+      Column({ space: 2 }) {
+        SymbolGlyph(t.icon)
+          .fontSize(21)
+          .fontColor([this.activeTab === t.index ? accentColor() : $r('app.color.text_secondary')])
+          .opacity(this.pressedIndex === t.index ? 0.55 : 1)
+        Text(t.label)
+          .fontSize(10)
+          .fontWeight(this.activeTab === t.index ? FontWeight.Medium : FontWeight.Regular)
+          .fontColor(this.activeTab === t.index ? accentColor() : $r('app.color.text_secondary'))
+          .opacity(this.pressedIndex === t.index ? 0.55 : 1)
+      }
+      .height('100%')
+      .justifyContent(FlexAlign.Center)
+      .onClick((): void => {
+        this.tabsController.changeIndex(t.index);
+        this.activeTab = t.index;
       })
-      .padding({ bottom: 0 });
+      .onTouch((event: TouchEvent): void => {
+        if (event.type === TouchType.Down) {
+          this.pressedIndex = t.index;
+        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
+          this.pressedIndex = -1;
+        }
+      })
+      .accessibilityText(t.label + (this.activeTab === t.index ? '，已选中' : ''))
+      .accessibilityLevel('yes')
+    }, (t: TabDef): string => `dock${t.index}_${this.activeTab}`)
   }
 
-  private symbolFor(index: number): Resource {
-    if (index === 1) {
-      return $r('sys.symbol.list_bullet_square');
+  /** 磨砂玻璃 dock（VHome dockFrost 同款：白/墨蓝玻璃底 + 真模糊 + 描边 + 投影），
+   *  内容延伸到 dock 后面穿透采样，沉浸光感真实可见 */
+  @Builder
+  dockFrost() {
+    Column() {
+      Row() {
+        this.dockItems()
+      }
+      .width('100%')
+      .height(DOCK_HEIGHT)
+      .justifyContent(FlexAlign.SpaceBetween)
+      .padding({ left: 20, right: 20 })
+      .borderRadius(DOCK_HEIGHT / 2)
+      .backgroundColor(this.isDark ? '#661B1E24' : '#66FFFFFF')
+      .backgroundBlurStyle(BlurStyle.Regular, { scale: 0.85 })
+      .border({ width: 0.5, color: this.isDark ? '#55FFFFFF' : '#B8FFFFFF' })
+      .clip(true)
+      .shadow({ radius: 24, color: this.isDark ? '#88000000' : '#30101824', offsetY: 8 })
     }
-    if (index === 2) {
-      return $r('sys.symbol.bag');
-    }
-    if (index === 3) {
-      return $r('sys.symbol.folder');
-    }
-    return $r('sys.symbol.doc_text');
+    .width('100%')
+    .padding({ left: 16, right: 16, bottom: DOCK_BOTTOM_MARGIN })
+    .hitTestBehavior(HitTestMode.None)
   }
 
   build() {
     Stack() {
     HdsNavigation() {
-      HdsTabs({ controller: this.hdsTabsController, index: this.activeTab }) {
+      Tabs({ barPosition: BarPosition.End, index: this.activeTab, controller: this.tabsController }) {
         TabContent() {
           MenuLibraryTab({ pageScroller: this.libraryScroller })
         }
-        .tabBar(this.hdsTabBar(this.symbolFor(0), '菜单库'))
 
         TabContent() {
           OrderTab({ pageScroller: this.orderScroller })
         }
-        .tabBar(this.hdsTabBar(this.symbolFor(1), '点菜'))
 
         TabContent() {
           ShoppingTab({ pageScroller: this.shoppingScroller })
         }
-        .tabBar(this.hdsTabBar(this.symbolFor(2), '采购'))
 
         TabContent() {
           PantryTab({ pageScroller: this.pantryScroller })
         }
-        .tabBar(this.hdsTabBar(this.symbolFor(3), '食材'))
       }
       .width('100%')
       .height('100%')
       .barPosition(BarPosition.End)
-      .barOverlap(true)
-      .scrollable(true)
+      .barHeight(0)
+      .scrollable(false)
       .animationDuration(0)
-      .attributeModifier(this.hdsTabsModifier)
       .backgroundColor($r('app.color.page_background'))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onChange((index: number): void => {
@@ -190,6 +209,9 @@ struct MainTab {
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+
+    // 悬浮玻璃 dock（叠在 Tabs 之上；外层 hitTest None，点击落在页签项）
+    this.dockFrost()
 
     // 首启隐私同意弹层（审核 4.1）：同意前阻断使用；可看全文；不同意退出
     if (this.showPrivacy) {
