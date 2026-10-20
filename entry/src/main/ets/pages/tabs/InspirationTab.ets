@@ -149,12 +149,12 @@ export struct InspirationTab {
       }
 
       ListItem() {
-        Column().width('100%').height(48)
+        Column().width('100%').height(92)
       }
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, bottom: 92 })
+    .padding({ left: 16, right: 16 })
     .edgeEffect(EdgeEffect.Spring)
   }
 }

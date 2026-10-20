@@ -1,9 +1,11 @@
 /** 功能四：食材管理 —— 小票识别入库 / 新鲜度(气温+储存状态) / 手动校准 / 消耗记录 */
-import { router } from '@kit.ArkUI';
+import { router, promptAction } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
 import { ConsumeRecord, FreshLevel, StockItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { Freshness } from '../../service/Freshness';
-import { Weather } from '../../service/Weather';
+import { Weather, City } from '../../service/Weather';
+import { LocationService, LocateResult } from '../../service/LocationService';
 import { topAvoid } from '../../utils/Theme';
 import { WidgetSync } from '../../service/WidgetSync';
 import { GlassPill } from '../../components/GlassPill';
@@ -34,36 +36,54 @@ export struct PantryTab {
     Stack() {
       // v1.9.0 沉浸光感：操作行并入列表首项，内容透出到标题栏后面
       List({ scroller: this.pageScroller, space: 10 }) {
-        // 首项：避让 spacer + 气温提示 / 操作按钮行
+        // 首项：避让 spacer + 操作按钮行 + 右对齐城市天气（v1.11.5 移到右侧）
         ListItem() {
-          Row() {
-            Text(this.hintText())
-              .fontSize(12).fontColor(this.soonCount() > 0 ? $r('app.color.tag_orange') : $r('app.color.text_tertiary'))
-              .layoutWeight(1)
-              .onClick((): void => {
-                this.showCity = !this.showCity;
+          Column({ space: 8 }) {
+            Row() {
+              GlassPill({
+                icon: $r('sys.symbol.square_and_pencil'),
+                label: '手动录入',
+                onTap: (): void => {
+                  router.pushUrl({ url: 'pages/StockManual' });
+                }
               })
-            GlassPill({
-              icon: $r('sys.symbol.square_and_pencil'),
-              label: '手动录入',
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/StockManual' });
-              }
+              GlassPill({
+                icon: $r('sys.symbol.picture'),
+                label: '拍小票入库',
+                onTap: (): void => {
+                  router.pushUrl({ url: 'pages/ReceiptScan' });
+                }
+              }).margin({ left: 10 })
+              Blank()
+              GlassPill({
+                icon: $r('sys.symbol.navigation'),
+                fixedWidth: 40,
+                onTap: (): void => {
+                  this.doLocate();
+                }
+              })
+              GlassPill({
+                icon: $r('sys.symbol.gearshape'),
+                fixedWidth: 52,
+                onTap: (): void => {
+                  router.pushUrl({ url: 'pages/Settings' });
+                }
+              }).margin({ left: 8 })
+            }
+            .width('100%')
+
+            // 城市天气胶囊：点击切换城市
+            Row({ space: 4 }) {
+              Text(this.cityTempText())
+                .fontSize(12).fontColor($r('app.color.text_secondary'))
+              SymbolGlyph($r('sys.symbol.chevron_down'))
+                .fontSize(11).fontColor([$r('app.color.text_tertiary')])
+            }
+            .justifyContent(FlexAlign.End)
+            .width('100%')
+            .onClick((): void => {
+              this.showCity = true;
             })
-            GlassPill({
-              icon: $r('sys.symbol.picture'),
-              label: '拍小票入库',
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/ReceiptScan' });
-              }
-            }).margin({ left: 10 })
-            GlassPill({
-              icon: $r('sys.symbol.gearshape'),
-              fixedWidth: 52,
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/Settings' });
-              }
-            }).margin({ left: 10 })
           }
           .width('100%')
           .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })
@@ -121,10 +141,15 @@ export struct PantryTab {
             }
           }
         }
+      // 尾部 spacer：内容视口直达屏幕底（小白条沉浸，同点菜页）；
+      // 滚到底时末卡恰好停在悬浮胶囊上沿
+      ListItem() {
+        Column().width('100%').height(92)
+      }
       }
       .width('100%')
       .height('100%')
-      .padding({ left: 16, right: 16, bottom: 92 })
+      .padding({ left: 16, right: 16 })
       .edgeEffect(EdgeEffect.Spring)
       // 悬浮层（校准/城市弹层）仍在 Stack 内，Stack 于 build 尾部闭合
 
@@ -263,6 +288,35 @@ export struct PantryTab {
     return this.climateText.length > 0
       ? `${this.climateText} · 点菜时自动扣减库存（点此换城市）`
       : '按采购日期与气候估算新鲜程度；点菜时自动扣减库存';
+  }
+
+  /** 城市天气短文案（右侧胶囊展示） */
+  private cityTempText(): string {
+    const t: number = Weather.cachedTemp();
+    const city: string = Weather.currentCity();
+    if (t === -999) {
+      return `${city} · 点击切换`;
+    }
+    return `${city} ${Math.round(t)}°C`;
+  }
+
+  /** 定位：取一次实时位置，就近匹配城市并刷新气候系数 */
+  private async doLocate(): Promise<void> {
+    try {
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      const r: LocateResult = await LocationService.locate(ctx);
+      if (r.ok) {
+        const near: City = Weather.nearestCity(r.lat, r.lon);
+        Weather.setAuto(near.name, r.lat, r.lon);
+        this.climateText = '';
+        this.refreshClimate();
+        promptAction.showToast({ message: `已定位：${near.name}，气温修正按实时位置更新` });
+      } else {
+        promptAction.showToast({ message: r.message });
+      }
+    } catch (e) {
+      promptAction.showToast({ message: '定位失败，请稍后重试或点击城市手动切换' });
+    }
   }
 
   /** 临期统计（建议尽快食用 + 建议评估丢弃） */

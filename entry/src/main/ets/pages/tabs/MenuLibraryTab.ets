@@ -177,10 +177,15 @@ export struct MenuLibraryTab {
           .padding({ top: 40, bottom: 60 })
         }
       }
+      // 尾部 spacer：内容视口直达屏幕底（小白条沉浸，同点菜页）；
+      // 滚到底时末卡恰好停在悬浮胶囊上沿
+      ListItem() {
+        Column().width('100%').height(92)
+      }
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, bottom: 92 })
+    .padding({ left: 16, right: 16 })
     .edgeEffect(EdgeEffect.Spring)
   }
 
