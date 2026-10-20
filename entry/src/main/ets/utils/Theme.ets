@@ -11,8 +11,8 @@ import { ScrollEffectType, TitleBarStyleOptions, HdsTitleBarContentStyle, hdsMat
 const TAG: string = 'Theme';
 const DOMAIN: number = 0x1C9;
 
-export const PRIMARY_LIGHT: string = '#E8622D';
-export const PRIMARY_DARK: string = '#F07B45';
+export const PRIMARY_LIGHT: string = '#ED6D3D';
+export const PRIMARY_DARK: string = '#ED6D3D';
 
 /**
  * HdsNavigation MINI 顶栏高度（vp）。

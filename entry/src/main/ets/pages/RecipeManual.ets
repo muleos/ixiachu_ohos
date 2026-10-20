@@ -127,6 +127,15 @@ struct RecipeManual {
       promptAction.showToast({ message: '请填写菜品名称' });
       return;
     }
+    try {
+      this.buildAndSave(n);
+    } catch (e) {
+      // 解析/估算异常兜底：不让确认动作闪退
+      promptAction.showToast({ message: '保存异常，请检查食材用量格式（如 300克）后重试' });
+    }
+  }
+
+  private buildAndSave(n: string): void {
     const recipe: Recipe = new Recipe();
     recipe.id = `m${Date.now()}`;
     recipe.name = n;

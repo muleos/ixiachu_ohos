@@ -207,7 +207,13 @@ struct RecipeImport {
       promptAction.showToast({ message: '请先粘贴菜谱文本' });
       return;
     }
-    const recipe: Recipe = RecipeParser.parse(this.text, '未命名菜谱');
+    let recipe: Recipe;
+    try {
+      recipe = RecipeParser.parse(this.text, '未命名菜谱');
+    } catch (e) {
+      promptAction.showToast({ message: '解析异常，请修正文本分段后重试' });
+      return;
+    }
     if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
       promptAction.showToast({ message: '未能识别出食材或步骤，请保留「食材：」「做法：」分段后重试' });
       return;

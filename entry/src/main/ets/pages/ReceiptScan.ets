@@ -195,10 +195,11 @@ struct ReceiptScan {
           .width('100%')
         }
         .padding(20)
-        .margin({ left: 32, right: 32 })
         .borderRadius(18)
         .backgroundColor($r('app.color.card_background'))
-        .width('100%')
+        // Stack 下 width('100%') 会让 margin 溢出失效（卡片几乎全宽），
+        // 改 calc 显式收窄：左右各 24vp
+        .width('calc(100% - 48vp)')
         .onClick((): void => {
           // 阻断冒泡，避免点弹窗内容关闭
         })
@@ -292,7 +293,12 @@ struct ReceiptScan {
 
   private applyText(text: string): void {
     this.rawText = text;
-    this.items = ReceiptParser.parseText(text);
+    try {
+      this.items = ReceiptParser.parseText(text);
+    } catch (e) {
+      // 双保险：parseText 内部已兜底，此处防御状态更新引发的渲染异常
+      this.items = [];
+    }
     if (this.items.length === 0 && text.trim().length > 0) {
       promptAction.showToast({ message: '未能从文本中解析出食材行，可手动删改文本（保留「品名 数量 价格」行）后重试' });
     }

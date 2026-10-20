@@ -19,12 +19,16 @@ struct MenuScan {
   @State rawText: string = '';
   @State scanning: boolean = false;
 
-  /** 识别文本的即时解析预览（空文本返回 null） */
+  /** 识别文本的即时解析预览（空文本/解析异常返回 null，异常不冒泡出 build） */
   private preview(): Recipe | null {
     if (this.rawText.trim().length < 10) {
       return null;
     }
-    return RecipeParser.parse(this.rawText, '未命名菜谱');
+    try {
+      return RecipeParser.parse(this.rawText, '未命名菜谱');
+    } catch (e) {
+      return null;
+    }
   }
 
   build() {
@@ -177,7 +181,13 @@ struct MenuScan {
       promptAction.showToast({ message: '请先识别或输入菜谱内容' });
       return;
     }
-    const recipe: Recipe = RecipeParser.parse(this.rawText, '图片识别菜谱');
+    let recipe: Recipe;
+    try {
+      recipe = RecipeParser.parse(this.rawText, '图片识别菜谱');
+    } catch (e) {
+      promptAction.showToast({ message: '解析异常，请修正文本后重试' });
+      return;
+    }
     if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
       promptAction.showToast({ message: '未能识别出食材或步骤，请修正文本后重试' });
       return;

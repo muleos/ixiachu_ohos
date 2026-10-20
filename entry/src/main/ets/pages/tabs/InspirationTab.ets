@@ -65,7 +65,7 @@ export struct InspirationTab {
           .borderRadius(16)
           .linearGradient({
             angle: 160,
-            colors: [['#F08A3C', 0], ['#E8622D', 1]]
+            colors: [['#F08A3C', 0], ['#ED6D3D', 1]]
           })
           .shadow({ radius: 12, color: '#33E8622D', offsetY: 4 })
         }

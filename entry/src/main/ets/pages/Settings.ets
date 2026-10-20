@@ -212,10 +212,11 @@ struct Settings {
           .width('100%')
         }
         .padding(20)
-        .margin({ left: 32, right: 32 })
         .borderRadius(18)
         .backgroundColor($r('app.color.card_background'))
-        .width('100%')
+        // Stack 下 width('100%') 会让 margin 溢出失效（卡片几乎全宽），
+        // 改 calc 显式收窄：左右各 24vp
+        .width('calc(100% - 48vp)')
         .onClick((): void => {
           // 阻断冒泡，避免点弹窗内容关闭
         })

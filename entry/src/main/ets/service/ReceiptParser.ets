@@ -53,8 +53,17 @@ export class ReceiptParser {
     return out;
   }
 
-  /** 从小票文本解析库存条目 */
+  /** 从小票文本解析库存条目（防御：异常兜底为空结果并记日志，绝不让页面闪退） */
   static parseText(text: string): StockItem[] {
+    try {
+      return ReceiptParser.doParseText(text);
+    } catch (e) {
+      hilog.error(DOMAIN, TAG, 'parseText crashed: %{public}s', (e as Error).message ?? '');
+      return [];
+    }
+  }
+
+  private static doParseText(text: string): StockItem[] {
     const items: StockItem[] = [];
     const seen: Set<string> = new Set<string>();
     const lines: string[] = ReceiptParser.normalizeText(text).split(/\r?\n/);

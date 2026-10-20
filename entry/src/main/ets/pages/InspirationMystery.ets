@@ -63,7 +63,7 @@ struct InspirationMystery {
           .width('100%')
           .padding({ top: 40, bottom: 36 })
           .borderRadius(22)
-          .linearGradient({ angle: 165, colors: [['#F08A3C', 0], ['#E8622D', 1]] })
+          .linearGradient({ angle: 165, colors: [['#F08A3C', 0], ['#ED6D3D', 1]] })
           .shadow({ radius: 24, color: '#44E8622D', offsetY: 8 })
         } else {
           // 抽中态：风味签卡
@@ -121,7 +121,7 @@ struct InspirationMystery {
             .height(48).borderRadius(24)
             .fontSize(16).fontWeight(FontWeight.Medium)
             .fontColor(Color.White)
-            .linearGradient({ angle: 90, colors: [['#F08A3C', 0], ['#E8622D', 1]] })
+            .linearGradient({ angle: 90, colors: [['#F08A3C', 0], ['#ED6D3D', 1]] })
             .onClick((): void => {
               this.draw();
             })
@@ -141,7 +141,7 @@ struct InspirationMystery {
               .height(46).borderRadius(23)
               .fontSize(15).fontWeight(FontWeight.Medium)
               .fontColor(Color.White)
-              .linearGradient({ angle: 90, colors: [['#F08A3C', 0], ['#E8622D', 1]] })
+              .linearGradient({ angle: 90, colors: [['#F08A3C', 0], ['#ED6D3D', 1]] })
               .onClick((): void => {
                 this.openDrawn();
               })
