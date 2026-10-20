@@ -119,7 +119,7 @@ export struct ShoppingTab {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16, bottom: 132 })
+    .padding({ left: 16, right: 16, bottom: 92 })
     .edgeEffect(EdgeEffect.Spring)
   }
 }
