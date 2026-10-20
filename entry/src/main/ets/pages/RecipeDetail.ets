@@ -46,6 +46,25 @@ struct RecipeDetail {
             .backgroundColor($r('app.color.card_background'))
         }
 
+        // 配图（网页导入保存的相关图片）
+        if (this.imgs().length > 0) {
+          Scroll() {
+            Row({ space: 8 }) {
+              ForEach(this.imgs(), (p: string): void => {
+                Image(`file://${p}`)
+                  .width(128)
+                  .height(96)
+                  .borderRadius(12)
+                  .objectFit(ImageFit.Cover)
+                  .backgroundColor($r('app.color.card_background'))
+              }, (p: string): string => p)
+            }
+          }
+          .scrollable(ScrollDirection.Horizontal)
+          .scrollBar(BarState.Off)
+          .width('100%')
+        }
+
         Text((this.recipe() as Recipe).name)
           .fontSize(24).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
           .width('100%')
@@ -137,6 +156,12 @@ struct RecipeDetail {
     const id: string = AppStorage.get<string>('currentRecipeId') ?? '';
     const r: Recipe | null = DataStore.getRecipe(id);
     return r !== null ? r : new Recipe();
+  }
+
+  /** 配图列表（存量数据兜底） */
+  private imgs(): string[] {
+    const list: string[] | undefined = (this.recipe() as Recipe).images;
+    return list === undefined || list === null ? [] : list;
   }
 
   @Builder

@@ -140,6 +140,9 @@ export class DataStore {
         if (r.cover === undefined || r.cover === null) {
           r.cover = '';
         }
+        if (r.images === undefined || r.images === null) {
+          r.images = [];
+        }
         if (r.tip === undefined || r.tip === null) {
           r.tip = '';
         }

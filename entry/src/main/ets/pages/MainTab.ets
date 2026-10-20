@@ -11,6 +11,7 @@ import { common } from '@kit.AbilityKit';
 import { accentColor, frostTitleStyle } from '../utils/Theme';
 import { DataStore } from '../service/DataStore';
 import { MenuLibraryTab } from './tabs/MenuLibraryTab';
+import { InspirationTab } from './tabs/InspirationTab';
 import { OrderTab } from './tabs/OrderTab';
 import { ShoppingTab } from './tabs/ShoppingTab';
 import { PantryTab } from './tabs/PantryTab';
@@ -33,9 +34,10 @@ class TabDef {
 
 const TABS: TabDef[] = [
   new TabDef(0, '菜单库', $r('sys.symbol.doc_text')),
-  new TabDef(1, '点菜', $r('sys.symbol.list_bullet_square')),
-  new TabDef(2, '采购', $r('sys.symbol.bag')),
-  new TabDef(3, '食材', $r('sys.symbol.folder'))
+  new TabDef(1, '灵感', $r('sys.symbol.lightbulb')),
+  new TabDef(2, '点菜', $r('sys.symbol.list_bullet_square')),
+  new TabDef(3, '采购', $r('sys.symbol.bag')),
+  new TabDef(4, '食材', $r('sys.symbol.folder'))
 ];
 
 @Entry
@@ -51,6 +53,7 @@ struct MainTab {
   @State showPrivacy: boolean = DataStore.getSetting('privacy_agreed') !== '1';
   private tabsController: TabsController = new TabsController();
   private libraryScroller: Scroller = new Scroller();
+  private inspirationScroller: Scroller = new Scroller();
   private orderScroller: Scroller = new Scroller();
   private shoppingScroller: Scroller = new Scroller();
   private pantryScroller: Scroller = new Scroller();
@@ -92,12 +95,15 @@ struct MainTab {
 
   private currentTitle(): string {
     if (this.activeTab === 1) {
-      return '点菜';
+      return '灵感';
     }
     if (this.activeTab === 2) {
-      return '采购清单';
+      return '点菜';
     }
     if (this.activeTab === 3) {
+      return '采购清单';
+    }
+    if (this.activeTab === 4) {
       return '食材管理';
     }
     return '菜单库';
@@ -168,6 +174,10 @@ struct MainTab {
         }
 
         TabContent() {
+          InspirationTab({ pageScroller: this.inspirationScroller })
+        }
+
+        TabContent() {
           OrderTab({ pageScroller: this.orderScroller })
         }
 
@@ -204,7 +214,7 @@ struct MainTab {
     .titleMode(HdsNavigationTitleMode.MINI)
     .hideTitleBar(false)
     .hideBackButton(true)
-    .bindToScrollable([this.libraryScroller, this.orderScroller, this.shoppingScroller, this.pantryScroller])
+    .bindToScrollable([this.libraryScroller, this.inspirationScroller, this.orderScroller, this.shoppingScroller, this.pantryScroller])
     .width('100%')
     .height('100%')
     .backgroundColor($r('app.color.page_background'))

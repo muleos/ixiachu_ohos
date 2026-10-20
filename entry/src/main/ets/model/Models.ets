@@ -62,8 +62,10 @@ export class Recipe {
   tip: string = '';
   /** 来源：手动导入 / 下厨房精选 / 在线导入 / 手动创建 */
   source: string = '手动导入';
-  /** 封面图本地路径（手动创建选填，空为无封面） */
+  /** 封面图本地路径（手动创建/网页导入选填，空为无封面） */
   cover: string = '';
+  /** 配图本地路径列表（网页导入保存的相关图片，最多 3 张） */
+  images: string[] = [];
   /** 原始导入文本 */
   sourceText: string = '';
   importTime: number = 0;

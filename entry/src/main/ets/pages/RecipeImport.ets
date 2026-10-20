@@ -1,14 +1,16 @@
 /**
- * 导入菜谱：
- * ① 手动创建（表单式，参照系统菜谱 App 体验）；
- * ② 粘贴文字版菜谱 → 自动识别食材/做法/营养热量；
- * ③ 下厨房在线导入 —— 接口结构对齐 ruter/xiachufang-api（自部署服务地址可配置）。
- * v1.10.0：顶栏换官方 FrostPage 沉浸光感；新增手动创建入口。
+ * 导入菜谱（v1.11.0）：
+ * ① 手动创建（表单式）；
+ * ② 网页链接导入 —— 粘贴下厨房/小红书/微博等帖子链接，抓取网页自动生成菜谱，
+ *    相关图片一并下载随菜谱保存（替代原下厨房专用 API，全平台通用）；
+ * ③ 粘贴文字版菜谱 → 自动识别食材/做法/营养热量。
  */
 import { router, promptAction } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
+import { Recipe } from '../model/Models';
 import { RecipeParser } from '../service/RecipeParser';
 import { DataStore } from '../service/DataStore';
-import { XiachufangApi } from '../service/XiachufangApi';
+import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
 import { FrostPage } from '../components/FrostPage';
 
 const SAMPLE: string = `番茄炒蛋（2人份）
@@ -27,22 +29,16 @@ const SAMPLE: string = `番茄炒蛋（2人份）
 3. 锅中留油，下番茄炒出汁水。
 4. 倒回鸡蛋，加盐和糖翻炒均匀，撒葱花出锅。`;
 
-const API_BASE_KEY: string = 'xiachufang_api_base';
-const DEFAULT_API_BASE: string = 'http://127.0.0.1:5000';
-
 @Entry
 @Component
 struct RecipeImport {
   private scroller: Scroller = new Scroller();
   @State text: string = '';
-  @State apiBase: string = '';
-  @State recipeInput: string = '';
+  @State urlInput: string = '';
   @State importing: boolean = false;
-
-  aboutToAppear(): void {
-    const saved: string = DataStore.getSetting(API_BASE_KEY);
-    this.apiBase = saved.length > 0 ? saved : DEFAULT_API_BASE;
-  }
+  /** 网页解析成功但识别不全时，暂存已下载图片，等「识别并入库」一起落 */
+  @State pendingCover: string = '';
+  @State pendingImages: string[] = [];
 
   build() {
     Stack() {
@@ -67,12 +63,44 @@ struct RecipeImport {
             router.pushUrl({ url: 'pages/RecipeManual' });
           })
 
-          // ① 文字粘贴识别
+          // ① 网页链接导入（下厨房/小红书/微博等帖子）
+          Column({ space: 10 }) {
+            Text('网页链接导入').fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+              .width('100%')
+            TextInput({
+              placeholder: '粘贴菜谱帖子链接（下厨房 / 小红书 / 微博等）',
+              text: this.urlInput
+            })
+              .width('100%')
+              .height(40).fontSize(13)
+              .fontColor($r('app.color.text_primary'))
+              .placeholderColor($r('app.color.text_tertiary'))
+              .backgroundColor($r('app.color.page_background'))
+              .borderRadius(10)
+              .onChange((v: string): void => {
+                this.urlInput = v;
+              })
+            Button(this.importing ? '解析中…' : '解析网页并导入')
+              .width('100%').height(40).borderRadius(20)
+              .backgroundColor($r('app.color.accent'))
+              .fontColor(Color.White)
+              .enabled(!this.importing)
+              .onClick((): void => {
+                this.doWebImport();
+              })
+            Text('自动读取网页标题、正文与配图生成菜谱；脚本渲染/需登录的页面可能提取不全，可在下方文本框手动修正')
+              .fontSize(11).fontColor($r('app.color.text_tertiary'))
+          }
+          .width('100%').padding(16).borderRadius(16)
+          .backgroundColor($r('app.color.card_background'))
+          .alignItems(HorizontalAlign.Start)
+
+          // ② 文字粘贴识别
           Column({ space: 8 }) {
             Text('粘贴文字版菜谱').fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
               .width('100%')
             TextArea({
-              placeholder: '支持「食材/用料」与「做法/步骤」分段，\n自动识别菜名、食材用量、营养价值与热量估算。',
+              placeholder: '支持「食材/用料」与「做法/步骤」分段，\n自动识别菜名、食材用量、营养价值与热量估算。\n网页解析结果也会回填到这里，可手动修正。',
               text: this.text
             })
               .width('100%')
@@ -98,54 +126,10 @@ struct RecipeImport {
                 .backgroundColor($r('app.color.accent'))
                 .fontColor(Color.White)
                 .onClick((): void => {
-                  if (this.text.trim().length < 10) {
-                    promptAction.showToast({ message: '请先粘贴菜谱文本' });
-                    return;
-                  }
-                  const recipe = RecipeParser.parse(this.text, '未命名菜谱');
-                  DataStore.saveRecipe(recipe);
-                  promptAction.showToast({ message: `已识别：${recipe.name}（${recipe.ingredients.length}种食材 / ${recipe.steps.length}步 / 约${recipe.nutrition.kcal}kcal每份）` });
-                  router.back();
+                  this.saveFromText();
                 })
             }
             .width('100%')
-          }
-          .width('100%').padding(16).borderRadius(16)
-          .backgroundColor($r('app.color.card_background'))
-          .alignItems(HorizontalAlign.Start)
-
-          // ② 在线导入（下厨房）
-          Column({ space: 10 }) {
-            Text('下厨房在线导入').fontSize(16).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-            TextInput({ placeholder: '服务地址（自部署 xiachufang-api）', text: this.apiBase })
-              .height(38).fontSize(13)
-              .fontColor($r('app.color.text_primary'))
-              .placeholderColor($r('app.color.text_tertiary'))
-              .backgroundColor($r('app.color.page_background'))
-              .borderRadius(10)
-              .onChange((v: string): void => {
-                this.apiBase = v;
-                DataStore.setSetting(API_BASE_KEY, v);
-              })
-            TextInput({ placeholder: '粘贴菜谱链接或 ID，如 https://www.xiachufang.com/recipe/101772749/', text: this.recipeInput })
-              .height(38).fontSize(13)
-              .fontColor($r('app.color.text_primary'))
-              .placeholderColor($r('app.color.text_tertiary'))
-              .backgroundColor($r('app.color.page_background'))
-              .borderRadius(10)
-              .onChange((v: string): void => {
-                this.recipeInput = v;
-              })
-            Button(this.importing ? '拉取中…' : '从下厨房导入')
-              .width('100%').height(40).borderRadius(20)
-              .backgroundColor($r('app.color.accent'))
-              .fontColor(Color.White)
-              .enabled(!this.importing)
-              .onClick((): void => {
-                this.doOnlineImport();
-              })
-            Text('需自行部署 ruter/xiachufang-api 服务并填入地址；解析其 /recipe/{id}/ 接口')
-              .fontSize(11).fontColor($r('app.color.text_tertiary'))
           }
           .width('100%').padding(16).borderRadius(16)
           .backgroundColor($r('app.color.card_background'))
@@ -159,25 +143,95 @@ struct RecipeImport {
     .height('100%')
   }
 
-  private async doOnlineImport(): Promise<void> {
-    const id: string = XiachufangApi.extractId(this.recipeInput);
-    if (id.length === 0) {
-      promptAction.showToast({ message: '请粘贴有效的下厨房菜谱链接或 ID' });
-      return;
-    }
-    if (this.apiBase.trim().length === 0) {
-      promptAction.showToast({ message: '请先填写 xiachufang-api 服务地址' });
+  /** 网页链接导入：抓取 → 解析 → 下载配图 → 入库（识别不全则回填文本待修正） */
+  private async doWebImport(): Promise<void> {
+    const url: string = WebRecipeImporter.normalizeUrl(this.urlInput);
+    if (url.length === 0) {
+      promptAction.showToast({ message: '请先粘贴网页链接' });
       return;
     }
     this.importing = true;
     try {
-      const recipe = await XiachufangApi.fetchRecipe(this.apiBase.trim(), id);
+      const page: WebPageContent = await WebRecipeImporter.fetchPage(url);
+      if (!page.ok) {
+        promptAction.showToast({ message: page.message });
+        if (page.text.length > 0) {
+          this.text = page.text;
+        }
+        this.importing = false;
+        return;
+      }
+      // 组装解析文本：标题 + 描述 + 正文（菜名取标题）
+      const fullText: string =
+        `${page.title}\n\n${page.desc.length > 0 ? page.desc + '\n\n' : ''}${page.text}`;
+      this.text = fullText;
+
+      // 下载配图（og:image 优先，最多 3 张随菜谱保存）
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      const locals: string[] = [];
+      for (const u of page.imageUrls) {
+        if (locals.length >= 3) {
+          break;
+        }
+        const p: string = await WebRecipeImporter.downloadImage(ctx, u);
+        if (p.length > 0) {
+          locals.push(p);
+        }
+      }
+      this.pendingCover = locals.length > 0 ? locals[0] : '';
+      this.pendingImages = locals.slice(1);
+
+      const recipe: Recipe = RecipeParser.parse(fullText, page.title.length > 0 ? page.title : '网页菜谱');
+      if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
+        promptAction.showToast({
+          message: '已抓取网页内容并填入文本框，自动识别不全，请修正「食材/做法」分段后点「识别并入库」'
+        });
+        this.importing = false;
+        return;
+      }
+      this.applyWebMeta(recipe, url);
       DataStore.saveRecipe(recipe);
-      promptAction.showToast({ message: `已导入：${recipe.name}（${recipe.ingredients.length}种食材 / ${recipe.steps.length}步）` });
+      promptAction.showToast({
+        message: `已导入：${recipe.name}（${recipe.ingredients.length}种食材 / ${recipe.steps.length}步${locals.length > 0 ? ` / ${locals.length}张配图` : ''}）`
+      });
       router.back();
     } catch (e) {
-      promptAction.showToast({ message: `导入失败：${(e as Error).message}，请检查服务地址与网络` });
+      promptAction.showToast({ message: `导入失败：${(e as Error).message}` });
     }
     this.importing = false;
+  }
+
+  /** 文本识别入库（携带网页阶段暂存的配图） */
+  private saveFromText(): void {
+    if (this.text.trim().length < 10) {
+      promptAction.showToast({ message: '请先粘贴菜谱文本' });
+      return;
+    }
+    const recipe: Recipe = RecipeParser.parse(this.text, '未命名菜谱');
+    if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
+      promptAction.showToast({ message: '未能识别出食材或步骤，请保留「食材：」「做法：」分段后重试' });
+      return;
+    }
+    this.applyWebMeta(recipe, '');
+    DataStore.saveRecipe(recipe);
+    promptAction.showToast({
+      message: `已识别：${recipe.name}（${recipe.ingredients.length}种食材 / ${recipe.steps.length}步）`
+    });
+    router.back();
+  }
+
+  private applyWebMeta(recipe: Recipe, url: string): void {
+    if (this.pendingCover.length > 0) {
+      recipe.cover = this.pendingCover;
+    }
+    if (this.pendingImages.length > 0) {
+      recipe.images = this.pendingImages.slice();
+    }
+    if (url.length > 0) {
+      recipe.source = '网页导入';
+      recipe.sourceText = url;
+    }
+    this.pendingCover = '';
+    this.pendingImages = [];
   }
 }

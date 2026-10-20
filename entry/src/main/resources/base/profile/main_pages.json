@@ -8,6 +8,8 @@
     "pages/MenuScan",
     "pages/Settings",
     "pages/Privacy",
-    "pages/RecipeManual"
+    "pages/RecipeManual",
+    "pages/InspirationMystery",
+    "pages/InspirationSeason"
   ]
 }
