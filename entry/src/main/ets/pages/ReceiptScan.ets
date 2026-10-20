@@ -218,8 +218,16 @@ struct ReceiptScan {
     return '无价';
   }
 
-  /** 按类目分组展开成「标题行+条目行」交错列表 */
+  /** 按类目分组展开成「标题行+条目行」交错列表（build 中调用，防御异常） */
   private rows(): ReceiptRow[] {
+    try {
+      return this.doRows();
+    } catch (e) {
+      return [];
+    }
+  }
+
+  private doRows(): ReceiptRow[] {
     const map: Map<string, StockItem[]> = new Map<string, StockItem[]>();
     for (const it of this.items) {
       const list: StockItem[] | undefined = map.get(it.category);

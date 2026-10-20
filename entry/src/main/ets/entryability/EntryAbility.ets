@@ -7,6 +7,7 @@ import { hilog } from '@kit.PerformanceAnalysisKit';
 import { window } from '@kit.ArkUI';
 import { KeyboardAvoidMode } from '@ohos.arkui.UIContext';
 import { applyTheme, publishInsets } from '../utils/Theme';
+import { CrashLog } from '../utils/CrashLog';
 import { DataStore } from '../service/DataStore';
 import { SeedService } from '../service/SeedService';
 import { PriceSync } from '../service/PriceSync';
@@ -20,6 +21,8 @@ export default class EntryAbility extends UIAbility {
   private darkModeEnabled: boolean = false;
 
   onCreate(want: Want, launchParam: AbilityConstant.LaunchParam): void {
+    // 全局异常取证：未捕获异常/Promise rejection 落 files/crash.log（闪退可溯源）
+    CrashLog.install(this.context);
     // 预种全局键：@StorageProp 对挂载时后补的 key 同步不可靠
     AppStorage.setOrCreate<boolean>('isDarkMode', false);
     AppStorage.setOrCreate<number>('statusBarHeight', 0);
