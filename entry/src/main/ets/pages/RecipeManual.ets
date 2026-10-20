@@ -191,7 +191,11 @@ struct RecipeManual {
     FrostPage({
       title: '制作菜单',
       subtitle: '记录专属于您的私家美味',
-      scroller: this.scroller
+      scroller: this.scroller,
+      rightIcon: $r('sys.symbol.checkmark'),
+      onRight: (): void => {
+        this.save();
+      }
     }) {
       Column({ space: 14 }) {
         // 封面图（选填）
@@ -358,79 +362,82 @@ struct RecipeManual {
         .backgroundColor($r('app.color.card_background'))
         .alignItems(HorizontalAlign.Start)
 
-        // 制作步骤
-        Column({ space: 14 }) {
-          Row() {
-            Text('制作步骤').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
-            Blank()
-            Row({ space: 4 }) {
-              SymbolGlyph($r('sys.symbol.plus')).fontSize(14).fontColor([$r('app.color.accent')])
-              Text('添加步骤').fontSize(13).fontColor($r('app.color.accent'))
-            }
-            .onClick((): void => {
-              this.addStep();
-            })
+        // 制作步骤（表头独立；每步独立白卡，输入块灰底可辨——酷安/官方表单语言）
+        Row() {
+          Text('制作步骤').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+          Blank()
+          Row({ space: 4 }) {
+            SymbolGlyph($r('sys.symbol.plus')).fontSize(14).fontColor([$r('app.color.accent')])
+            Text('添加步骤').fontSize(13).fontColor($r('app.color.accent'))
           }
-          .width('100%')
-          ForEach(this.steps, (row: StepRow, i: number): void => {
-            Column({ space: 10 }) {
-              Row() {
-                Text(`第 ${i + 1} 步`).fontSize(13).fontWeight(FontWeight.Medium)
-                  .fontColor($r('app.color.accent'))
-                Blank()
-                SymbolGlyph($r('sys.symbol.trash'))
-                  .fontSize(15)
-                  .fontColor([$r('app.color.text_tertiary')])
-                  .onClick((): void => {
-                    this.removeStep(i);
-                  })
-              }
+          .onClick((): void => {
+            this.addStep();
+          })
+        }
+        .width('100%')
+
+        ForEach(this.steps, (row: StepRow, i: number): void => {
+          Column({ space: 10 }) {
+            Row() {
+              Text(`第 ${i + 1} 步`).fontSize(13).fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.accent'))
+              Blank()
+              SymbolGlyph($r('sys.symbol.trash'))
+                .fontSize(15)
+                .fontColor([$r('app.color.text_tertiary')])
+                .onClick((): void => {
+                  this.removeStep(i);
+                })
+            }
+            .width('100%')
+            // 操作说明（灰底输入块 1）
+            TextArea({ placeholder: '操作说明（例如：大火热锅，下入姜片与牛腩翻炒出香味）', text: row.text })
               .width('100%')
-              TextArea({ placeholder: '操作说明（例如：大火热锅，下入姜片与牛腩翻炒出香味）', text: row.text })
-                .width('100%')
-                .height(84)
-                .padding(12)
-                .borderRadius(12)
-                .backgroundColor($r('app.color.page_background'))
-                .fontSize(14)
+              .height(84)
+              .padding(12)
+              .borderRadius(12)
+              .backgroundColor($r('app.color.page_background'))
+              .fontSize(14)
+              .fontColor($r('app.color.text_primary'))
+              .placeholderColor($r('app.color.text_tertiary'))
+              .onChange((v: string): void => {
+                (this.steps[i] as StepRow).text = v;
+              })
+            // 开火时长（灰底输入块 2）
+            Row({ space: 8 }) {
+              SymbolGlyph($r('sys.symbol.clock')).fontSize(14).fontColor([$r('app.color.text_tertiary')])
+              TextInput({ placeholder: '开火时长（选填，如：15）', text: row.duration })
+                .layoutWeight(1)
+                .height(38).fontSize(13).type(InputType.NUMBER_DECIMAL)
                 .fontColor($r('app.color.text_primary'))
                 .placeholderColor($r('app.color.text_tertiary'))
+                .backgroundColor(Color.Transparent)
+                .padding({ left: 0, right: 0 })
                 .onChange((v: string): void => {
-                  (this.steps[i] as StepRow).text = v;
+                  (this.steps[i] as StepRow).duration = v;
                 })
-              Row({ space: 8 }) {
-                SymbolGlyph($r('sys.symbol.clock')).fontSize(14).fontColor([$r('app.color.text_tertiary')])
-                TextInput({ placeholder: '开火时长（选填，如：15）', text: row.duration })
-                  .layoutWeight(1)
-                  .height(38).fontSize(13).type(InputType.NUMBER_DECIMAL)
-                  .fontColor($r('app.color.text_primary'))
-                  .placeholderColor($r('app.color.text_tertiary'))
-                  .backgroundColor($r('app.color.page_background'))
-                  .borderRadius(10)
-                  .onChange((v: string): void => {
-                    (this.steps[i] as StepRow).duration = v;
-                  })
-                Text('分钟').fontSize(13).fontColor($r('app.color.text_secondary'))
-              }
-              .width('100%')
-              TextInput({ placeholder: '防翻车贴士（选填，如：此步骤切记小火）', text: row.tip })
-                .width('100%')
-                .height(38).fontSize(13)
-                .fontColor($r('app.color.text_secondary'))
-                .placeholderColor($r('app.color.text_tertiary'))
-                .backgroundColor($r('app.color.page_background'))
-                .borderRadius(10)
-                .onChange((v: string): void => {
-                  (this.steps[i] as StepRow).tip = v;
-                })
+              Text('分钟').fontSize(13).fontColor($r('app.color.text_secondary'))
             }
-            .width('100%').padding(14).borderRadius(14)
+            .width('100%')
+            .padding({ left: 12, right: 12 })
             .backgroundColor($r('app.color.page_background'))
-          }, (row: StepRow, i: number): string => `step_${i}`)
-        }
-        .width('100%').padding(16).borderRadius(16)
-        .backgroundColor($r('app.color.card_background'))
-        .alignItems(HorizontalAlign.Start)
+            .borderRadius(10)
+            // 防翻车贴士（灰底输入块 3）
+            TextInput({ placeholder: '防翻车贴士（选填，如：此步骤切记小火）', text: row.tip })
+              .width('100%')
+              .height(38).fontSize(13)
+              .fontColor($r('app.color.text_secondary'))
+              .placeholderColor($r('app.color.text_tertiary'))
+              .backgroundColor($r('app.color.page_background'))
+              .borderRadius(10)
+              .onChange((v: string): void => {
+                (this.steps[i] as StepRow).tip = v;
+              })
+          }
+          .width('100%').padding(14).borderRadius(16)
+          .backgroundColor($r('app.color.card_background'))
+          .alignItems(HorizontalAlign.Start)
+        }, (row: StepRow, i: number): string => `step_${i}`)
 
         // 保存
         Button('保存菜谱')
