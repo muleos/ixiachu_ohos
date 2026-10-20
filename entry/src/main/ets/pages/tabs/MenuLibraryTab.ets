@@ -3,6 +3,7 @@ import { router } from '@kit.ArkUI';
 import { Recipe } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { topAvoid } from '../../utils/Theme';
+import { GlassPill } from '../../components/GlassPill';
 
 @Component
 export struct MenuLibraryTab {
@@ -67,37 +68,21 @@ export struct MenuLibraryTab {
           .borderRadius(20)
           .backgroundColor($r('app.color.card_background'))
 
-          Button() {
-            Row({ space: 6 }) {
-              SymbolGlyph($r('sys.symbol.picture'))
-                .fontSize(18)
-                .fontColor([$r('app.color.accent')])
-              Text('识别').fontSize(14).fontColor($r('app.color.accent'))
+          GlassPill({
+            icon: $r('sys.symbol.picture'),
+            label: '识别',
+            onTap: (): void => {
+              router.pushUrl({ url: 'pages/MenuScan' });
             }
-          }
-          .backgroundColor($r('app.color.accent_soft'))
-          .height(40)
-          .borderRadius(20)
-          .margin({ left: 10 })
-          .onClick((): void => {
-            router.pushUrl({ url: 'pages/MenuScan' });
-          })
+          }).margin({ left: 10 })
 
-          Button() {
-            Row({ space: 6 }) {
-              SymbolGlyph($r('sys.symbol.plus_circle'))
-                .fontSize(18)
-                .fontColor([$r('app.color.accent')])
-              Text('导入').fontSize(14).fontColor($r('app.color.accent'))
+          GlassPill({
+            icon: $r('sys.symbol.plus_circle'),
+            label: '导入',
+            onTap: (): void => {
+              router.pushUrl({ url: 'pages/RecipeImport' });
             }
-          }
-          .backgroundColor($r('app.color.accent_soft'))
-          .height(40)
-          .borderRadius(20)
-          .margin({ left: 10 })
-          .onClick((): void => {
-            router.pushUrl({ url: 'pages/RecipeImport' });
-          })
+          }).margin({ left: 10 })
         }
         .width('100%')
       }

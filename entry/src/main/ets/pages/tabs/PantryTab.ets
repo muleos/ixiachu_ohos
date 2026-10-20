@@ -6,6 +6,7 @@ import { Freshness } from '../../service/Freshness';
 import { Weather } from '../../service/Weather';
 import { topAvoid } from '../../utils/Theme';
 import { WidgetSync } from '../../service/WidgetSync';
+import { GlassPill } from '../../components/GlassPill';
 
 @Component
 export struct PantryTab {
@@ -42,42 +43,27 @@ export struct PantryTab {
               .onClick((): void => {
                 this.showCity = !this.showCity;
               })
-            Button() {
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.square_and_pencil')).fontSize(16).fontColor([$r('app.color.accent')])
-                Text('手动录入').fontSize(14).fontColor($r('app.color.accent'))
+            GlassPill({
+              icon: $r('sys.symbol.square_and_pencil'),
+              label: '手动录入',
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/StockManual' });
               }
-            }
-            .backgroundColor($r('app.color.accent_soft'))
-            .height(36)
-            .borderRadius(18)
-            .onClick((): void => {
-              router.pushUrl({ url: 'pages/StockManual' });
             })
-            Button() {
-              Row({ space: 6 }) {
-                SymbolGlyph($r('sys.symbol.picture')).fontSize(16).fontColor([$r('app.color.accent')])
-                Text('拍小票入库').fontSize(14).fontColor($r('app.color.accent'))
+            GlassPill({
+              icon: $r('sys.symbol.picture'),
+              label: '拍小票入库',
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/ReceiptScan' });
               }
-            }
-            .backgroundColor($r('app.color.accent_soft'))
-            .height(36)
-            .borderRadius(18)
-            .margin({ left: 10 })
-            .onClick((): void => {
-              router.pushUrl({ url: 'pages/ReceiptScan' });
-            })
-            Button() {
-              SymbolGlyph($r('sys.symbol.gearshape')).fontSize(17).fontColor([$r('app.color.text_secondary')])
-            }
-            .backgroundColor($r('app.color.accent_soft'))
-            .height(36)
-            .width(52)
-            .borderRadius(18)
-            .margin({ left: 10 })
-            .onClick((): void => {
-              router.pushUrl({ url: 'pages/Settings' });
-            })
+            }).margin({ left: 10 })
+            GlassPill({
+              icon: $r('sys.symbol.gearshape'),
+              fixedWidth: 52,
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/Settings' });
+              }
+            }).margin({ left: 10 })
           }
           .width('100%')
           .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })

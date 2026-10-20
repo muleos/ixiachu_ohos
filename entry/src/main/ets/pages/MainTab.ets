@@ -1,12 +1,14 @@
 /**
- * I下厨 主框架（v1.10.2）：
- * 顶栏：HdsNavigation 沉浸光感渐变模糊（IMMERSIVE_GRADIENT_BLUR，bindToScrollable 绑定各页滚动器）。
- * 底栏：VHome 同款自建悬浮玻璃 dock（真模糊 BlurStyle.Regular + 白/墨蓝玻璃底 + 描边投影），
- *       内容延伸到 dock 后面穿透采样——官方 HdsTabs 悬浮岛材质真机偏实底，沉浸感不足，故换回自绘。
- * 避让：四 Tab 列表底部留白 132vp（dock 占位 24 + 56 = 80vp 之上留足余量）。
+ * I下厨 主框架 —— 官方槽位（v1.11.1 底栏回归官方样式）：
+ * HdsNavigation 顶栏（IMMERSIVE_GRADIENT_BLUR 沉浸光感）+
+ * HdsTabs 官方悬浮胶囊底栏（barFloatingStyle + IMMERSIVE 材质，barHeight 56 / barBottomMargin 30）。
+ * 五页签：菜单库 / 灵感 / 点菜 / 采购 / 食材。
  */
-import { mediaquery, router } from '@kit.ArkUI';
-import { HdsNavigation, HdsNavigationTitleMode, DividerShowType } from '@kit.UIDesignKit';
+import { SymbolGlyphModifier, mediaquery, router } from '@kit.ArkUI';
+import {
+  HdsNavigation, HdsNavigationTitleMode, HdsTabs, HdsTabsController, HdsTabsModifier,
+  hdsMaterial, DividerShowType
+} from '@kit.UIDesignKit';
 import { common } from '@kit.AbilityKit';
 import { accentColor, frostTitleStyle } from '../utils/Theme';
 import { DataStore } from '../service/DataStore';
@@ -16,9 +18,7 @@ import { OrderTab } from './tabs/OrderTab';
 import { ShoppingTab } from './tabs/ShoppingTab';
 import { PantryTab } from './tabs/PantryTab';
 
-/** 玻璃 dock 几何（VHome dockFrost 同款） */
-const DOCK_HEIGHT: number = 56;
-const DOCK_BOTTOM_MARGIN: number = 24;
+const TAB_BAR_HEIGHT: number = 56;
 
 class TabDef {
   index: number = 0;
@@ -43,15 +43,14 @@ const TABS: TabDef[] = [
 @Entry
 @Component
 struct MainTab {
-  @StorageProp('isDarkMode') isDark: boolean = false;
+  @StorageProp('isDarkMode') @Watch('onThemeChanged') isDark: boolean = false;
   /** 通知点击透传的目标 Tab（launchTab>=0 时切换；onNewWant 热启动也会触发本 Watch） */
   @StorageProp('launchTab') @Watch('onLaunchTab') launchTab: number = -1;
   @State activeTab: number = 0;
-  /** dock 按压态（UX 规范：按下变淡） */
-  @State pressedIndex: number = -1;
   /** 首启隐私同意（AGC 审核 4.1：未同意前遮罩阻断使用） */
   @State showPrivacy: boolean = DataStore.getSetting('privacy_agreed') !== '1';
-  private tabsController: TabsController = new TabsController();
+  @State hdsTabsModifier: HdsTabsModifier = new HdsTabsModifier();
+  private hdsTabsController: HdsTabsController = new HdsTabsController();
   private libraryScroller: Scroller = new Scroller();
   private inspirationScroller: Scroller = new Scroller();
   private orderScroller: Scroller = new Scroller();
@@ -60,6 +59,7 @@ struct MainTab {
   private mqListener: mediaquery.MediaQueryListener | null = null;
 
   aboutToAppear(): void {
+    this.configureHdsTabs();
     // 冷启动通知透传：直接落在目标 Tab
     const tab: number = AppStorage.get<number>('launchTab') ?? -1;
     if (tab >= 0) {
@@ -83,6 +83,29 @@ struct MainTab {
       } catch (e) {
       }
     }
+  }
+
+  /** 深浅色切换：modifier 持有颜色，必须整体换新 */
+  private onThemeChanged(): void {
+    this.configureHdsTabs();
+  }
+
+  private configureHdsTabs(): void {
+    const modifier: HdsTabsModifier = new HdsTabsModifier();
+    modifier
+      .vertical(false)
+      .barPosition(BarPosition.End)
+      .barHeight(TAB_BAR_HEIGHT)
+      .barFloatingStyle({
+        adaptToHandedness: true,
+        barBottomMargin: 30,
+        lightColor: accentColor(),
+        systemMaterialEffect: {
+          materialType: hdsMaterial.MaterialType.IMMERSIVE,
+          materialLevel: hdsMaterial.MaterialLevel.ADAPTIVE
+        }
+      });
+    this.hdsTabsModifier = modifier;
   }
 
   /** 热启动点通知：AppStorage.launchTab 变化 → 切页 */
@@ -109,92 +132,57 @@ struct MainTab {
     return '菜单库';
   }
 
-  @Builder
-  dockItems() {
-    ForEach(TABS, (t: TabDef): void => {
-      Column({ space: 2 }) {
-        SymbolGlyph(t.icon)
-          .fontSize(21)
-          .fontColor([this.activeTab === t.index ? accentColor() : $r('app.color.text_secondary')])
-          .opacity(this.pressedIndex === t.index ? 0.55 : 1)
-        Text(t.label)
-          .fontSize(10)
-          .fontWeight(this.activeTab === t.index ? FontWeight.Medium : FontWeight.Regular)
-          .fontColor(this.activeTab === t.index ? accentColor() : $r('app.color.text_secondary'))
-          .opacity(this.pressedIndex === t.index ? 0.55 : 1)
-      }
-      .height('100%')
-      .justifyContent(FlexAlign.Center)
-      .onClick((): void => {
-        this.tabsController.changeIndex(t.index);
-        this.activeTab = t.index;
+  private hdsTabBar(icon: Resource, label: string): BottomTabBarStyle {
+    const normalGlyph: SymbolGlyphModifier = new SymbolGlyphModifier(icon)
+      .renderingStrategy(SymbolRenderingStrategy.SINGLE);
+    normalGlyph.fontColor([$r('app.color.text_secondary')]);
+    const selectedGlyph: SymbolGlyphModifier = new SymbolGlyphModifier(icon)
+      .renderingStrategy(SymbolRenderingStrategy.SINGLE);
+    selectedGlyph.fontColor([accentColor()]);
+    return BottomTabBarStyle.of({ normal: normalGlyph, selected: selectedGlyph }, label)
+      .labelStyle({
+        unselectedColor: $r('app.color.text_secondary'),
+        selectedColor: accentColor()
       })
-      .onTouch((event: TouchEvent): void => {
-        if (event.type === TouchType.Down) {
-          this.pressedIndex = t.index;
-        } else if (event.type === TouchType.Up || event.type === TouchType.Cancel) {
-          this.pressedIndex = -1;
-        }
-      })
-      .accessibilityText(t.label + (this.activeTab === t.index ? '，已选中' : ''))
-      .accessibilityLevel('yes')
-    }, (t: TabDef): string => `dock${t.index}_${this.activeTab}`)
-  }
-
-  /** 磨砂玻璃 dock（VHome dockFrost 同款：白/墨蓝玻璃底 + 真模糊 + 描边 + 投影），
-   *  内容延伸到 dock 后面穿透采样，沉浸光感真实可见 */
-  @Builder
-  dockFrost() {
-    Column() {
-      Row() {
-        this.dockItems()
-      }
-      .width('100%')
-      .height(DOCK_HEIGHT)
-      .justifyContent(FlexAlign.SpaceBetween)
-      .padding({ left: 20, right: 20 })
-      .borderRadius(DOCK_HEIGHT / 2)
-      .backgroundColor(this.isDark ? '#661B1E24' : '#66FFFFFF')
-      .backgroundBlurStyle(BlurStyle.Regular, { scale: 0.85 })
-      .border({ width: 0.5, color: this.isDark ? '#55FFFFFF' : '#B8FFFFFF' })
-      .clip(true)
-      .shadow({ radius: 24, color: this.isDark ? '#88000000' : '#30101824', offsetY: 8 })
-    }
-    .width('100%')
-    .padding({ left: 16, right: 16, bottom: DOCK_BOTTOM_MARGIN })
-    .hitTestBehavior(HitTestMode.None)
+      .padding({ bottom: 0 });
   }
 
   build() {
     Stack() {
     HdsNavigation() {
-      Tabs({ barPosition: BarPosition.End, index: this.activeTab, controller: this.tabsController }) {
+      HdsTabs({ controller: this.hdsTabsController, index: this.activeTab }) {
         TabContent() {
           MenuLibraryTab({ pageScroller: this.libraryScroller })
         }
+        .tabBar(this.hdsTabBar(TABS[0].icon, TABS[0].label))
 
         TabContent() {
           InspirationTab({ pageScroller: this.inspirationScroller })
         }
+        .tabBar(this.hdsTabBar(TABS[1].icon, TABS[1].label))
 
         TabContent() {
           OrderTab({ pageScroller: this.orderScroller })
         }
+        .tabBar(this.hdsTabBar(TABS[2].icon, TABS[2].label))
 
         TabContent() {
           ShoppingTab({ pageScroller: this.shoppingScroller })
         }
+        .tabBar(this.hdsTabBar(TABS[3].icon, TABS[3].label))
 
         TabContent() {
           PantryTab({ pageScroller: this.pantryScroller })
         }
+        .tabBar(this.hdsTabBar(TABS[4].icon, TABS[4].label))
       }
       .width('100%')
       .height('100%')
       .barPosition(BarPosition.End)
-      .barHeight(0)
-      .scrollable(false)
+      .barOverlap(true)
+      .scrollable(true)
       .animationDuration(0)
+      .attributeModifier(this.hdsTabsModifier)
       .backgroundColor($r('app.color.page_background'))
       .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
       .onChange((index: number): void => {
@@ -219,9 +207,6 @@ struct MainTab {
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-
-    // 悬浮玻璃 dock（叠在 Tabs 之上；外层 hitTest None，点击落在页签项）
-    this.dockFrost()
 
     // 首启隐私同意弹层（审核 4.1）：同意前阻断使用；可看全文；不同意退出
     if (this.showPrivacy) {
