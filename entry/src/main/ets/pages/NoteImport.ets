@@ -9,7 +9,7 @@ import { image } from '@kit.ImageKit';
 import { NoteItem } from '../model/Models';
 import { NoteStore } from '../service/NoteStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
-import { XhsResolver } from '../service/XhsResolver';
+import { XhsResolver, XhsResolveError } from '../service/XhsResolver';
 import { XhsUrlParser } from '../xhs/XhsUrlParser';
 import { ParsedXhsNote } from '../xhs/XhsNoteParser';
 import { FrostPage } from '../components/FrostPage';
@@ -28,6 +28,8 @@ struct NoteImport {
   /** 小红书解析失败原因（引导获取访问凭证） */
   @State lastError: string = '';
   @State failIsXhs: boolean = false;
+  /** 失败是否因「需要访问凭证」（决定显示获取凭证引导还是普通提示） */
+  @State needCredential: boolean = false;
 
   private async parse(): Promise<void> {
     const links: string[] = XhsUrlParser.extractLinks(this.urlInput);
@@ -38,6 +40,7 @@ struct NoteImport {
     const url: string = XhsUrlParser.normalizeUrl(links[0]);
     this.parsing = true;
     this.lastError = '';
+    this.needCredential = false;
     this.previewTitle = '';
     this.previewDesc = '';
     this.previewImages = [];
@@ -63,8 +66,10 @@ struct NoteImport {
         this.previewImages = locals;
         this.previewSource = '小红书';
       } catch (e) {
-        this.lastError = (e as Error).message ?? '解析失败';
+        const err: Error = e as Error;
+        this.lastError = err.message ?? '解析失败';
         this.failIsXhs = true;
+        this.needCredential = (err as XhsResolveError).needCredential === true;
       }
       this.parsing = false;
       return;
@@ -160,17 +165,22 @@ struct NoteImport {
               Text('解析未成功').fontSize(15).fontWeight(FontWeight.Medium)
                 .fontColor($r('app.color.text_primary')).width('100%')
               Text(this.lastError).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
-              Text('部分笔记需要访问凭证：点下方按钮在内置浏览器打开小红书，随便浏览一篇笔记后点「完成」返回，再点「解析」即可。')
-                .fontSize(12).lineHeight(19).fontColor($r('app.color.text_secondary')).width('100%')
-              Button('打开小红书获取凭证')
-                .width('100%')
-                .height(42).borderRadius(21)
-                .backgroundColor($r('app.color.accent'))
-                .fontColor(Color.White)
-                .fontSize(14)
-                .onClick((): void => {
-                  router.pushUrl({ url: 'pages/XhsSession' });
-                })
+              if (this.needCredential) {
+                Text('该笔记需要访问凭证：点下方按钮在内置浏览器打开小红书，随便浏览一篇笔记后点「完成」返回，再点「解析」即可。')
+                  .fontSize(12).lineHeight(19).fontColor($r('app.color.text_secondary')).width('100%')
+                Button('打开小红书获取凭证')
+                  .width('100%')
+                  .height(42).borderRadius(21)
+                  .backgroundColor($r('app.color.accent'))
+                  .fontColor(Color.White)
+                  .fontSize(14)
+                  .onClick((): void => {
+                    router.pushUrl({ url: 'pages/XhsSession' });
+                  })
+              } else {
+                Text('可检查链接是否仍有效，或换一篇公开笔记重试；部分站点需在小红书 App 内打开才能解析。')
+                  .fontSize(12).lineHeight(19).fontColor($r('app.color.text_secondary')).width('100%')
+              }
             }
             .width('100%').padding(14).borderRadius(14)
             .backgroundColor($r('app.color.card_background'))

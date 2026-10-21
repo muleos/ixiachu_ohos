@@ -17,6 +17,12 @@ import { XhsUrlParser } from '../xhs/XhsUrlParser';
 const TAG: string = 'XhsResolver';
 const MAX_HOPS: number = 5;
 
+/** 错误页判定结果：精确文案 + 是否「需要访问凭证」 */
+interface XhsErrorReason {
+  message: string;
+  credential: boolean;
+}
+
 export class XhsResolver {
   /** 与收藏/安卓端一致：移动 Chrome UA + xiaohongshu 后缀 */
   private static readonly UA: string =
@@ -26,41 +32,62 @@ export class XhsResolver {
   static async resolve(rawInput: string): Promise<ParsedXhsNote> {
     const links: string[] = XhsUrlParser.extractLinks(rawInput);
     if (links.length === 0) {
-      throw new Error('未在输入中识别到小红书链接（需包含 xiaohongshu.com 或 xhslink.com）');
+      throw new XhsResolveError('未在输入中识别到小红书链接（需包含 xiaohongshu.com 或 xhslink.com）', false);
     }
     let lastError: string = '解析失败';
+    let lastCredential: boolean = false;
     for (const link of links) {
       const url: string = XhsUrlParser.normalizeUrl(link);
       const noteId: string = XhsUrlParser.extractPostId(url);
       try {
         const html: string = await XhsResolver.fetchHtmlFollow(url, MAX_HOPS);
         const parsed: ParsedXhsNote = new XhsNoteParser().parse(html, noteId, url);
-        // 错误页识别：小红书拦截/404 页不作为结果
-        if (XhsResolver.isErrorPage(parsed)) {
-          lastError = '链接返回了小红书错误页：笔记可能已删除/仅自己可见，或需要访问凭证（先点下方按钮获取凭证再重试）';
+        // 错误页识别：小红书拦截/404 页不作为结果，并区分「需凭证」与「已删除/失效」
+        const reason: XhsErrorReason | null = XhsResolver.errorPageReason(parsed);
+        if (reason !== null) {
+          lastError = reason.message;
+          lastCredential = reason.credential;
           continue;
         }
         if (parsed.title.length > 0 || parsed.description.length > 0 || parsed.mediaUrls.length > 0) {
           return parsed;
         }
-        lastError = '未能从页面提取到笔记内容';
+        lastError = '未能从页面提取到笔记内容（页面可能未完整加载）';
+        lastCredential = false;
       } catch (e) {
-        lastError = (e as Error).message ?? '网络错误';
+        const m: string = (e as Error).message ?? '网络错误';
+        lastError = m;
+        lastCredential = m.indexOf('需要访问凭证') >= 0 || m.indexOf('凭证') >= 0;
       }
     }
-    throw new Error(lastError);
+    throw new XhsResolveError(lastError, lastCredential);
   }
 
-  /** 小红书拦截/错误页识别（标题与正文关键词） */
-  private static isErrorPage(parsed: ParsedXhsNote): boolean {
+  /**
+   * 小红书错误页识别（标题与正文关键词）。
+   * 返回 null 表示不是错误页；否则给出精确文案与是否「需要访问凭证」：
+   * - 笔记已删除/链接失效：无需引导获取凭证；
+   * - 访问受限/加载失败：多为风控或登录墙，引导获取凭证重试。
+   */
+  private static errorPageReason(parsed: ParsedXhsNote): XhsErrorReason | null {
     const text: string = `${parsed.title} ${parsed.description}`;
     const markers: string[] = ['页面不见', '页面不存在', '笔记不存在', '加载失败', '访问出错', '暂时无法浏览'];
+    let hit: boolean = false;
     for (const m of markers) {
       if (text.indexOf(m) >= 0) {
-        return true;
+        hit = true;
+        break;
       }
     }
-    return false;
+    if (!hit) {
+      return null;
+    }
+    // 已删除/失效：不引导获取凭证（凭证救不回已删的笔记）
+    if (text.indexOf('笔记不存在') >= 0 || text.indexOf('页面不存在') >= 0 || text.indexOf('页面不见') >= 0) {
+      return { message: '该笔记可能已删除或链接已失效，小红书返回了错误页', credential: false };
+    }
+    // 其余（加载失败/访问出错/暂时无法浏览）：多为访问受限，引导凭证
+    return { message: '该笔记需要访问凭证（请先点下方按钮获取凭证再重试）', credential: true };
   }
 
   /** GET 页面文本，手动跟随 3xx 重定向（最多 maxHops 跳），自动携带会话 Cookie */
@@ -115,7 +142,8 @@ export class XhsResolver {
             return;
           }
           if (code < 200 || code >= 300) {
-            reject(new Error(`小红书返回 HTTP ${code}${code === 404 ? '（链接可能已失效）' : ''}`));
+            const cred: boolean = code === 401 || code === 403;
+            reject(new Error(`小红书返回 HTTP ${code}${cred ? '（需要访问凭证）' : (code === 404 ? '（链接可能已失效）' : '')}`));
             return;
           }
           const text: string = typeof resp.result === 'string' ? resp.result : '';
@@ -154,5 +182,16 @@ class XhsResponse {
     this.isRedirect = isRedirect;
     this.location = location;
     this.text = text;
+  }
+}
+
+/** 解析失败错误：携带是否「需要访问凭证」，供页面决定引导策略（避免误引导） */
+export class XhsResolveError extends Error {
+  needCredential: boolean;
+
+  constructor(message: string, needCredential: boolean) {
+    super(message);
+    this.name = 'XhsResolveError';
+    this.needCredential = needCredential;
   }
 }
