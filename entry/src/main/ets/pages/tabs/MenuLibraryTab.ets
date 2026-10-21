@@ -12,6 +12,8 @@ export struct MenuLibraryTab {
   @StorageProp('dataRev') @Watch('reload') dataRev: number = 0;
   @State keyword: string = '';
   @State category: string = '全部';
+  /** 字母筛选（空=全部）；菜谱按拼音首字母排序 */
+  @State letterFilter: string = '';
   /** 菜谱列表用 @State 承载，dataRev 变化（种入/导入）后自动刷新 */
   @State allRecipes: Recipe[] = [];
 
@@ -37,6 +39,7 @@ export struct MenuLibraryTab {
   build() {
     // v1.9.0 沉浸光感：搜索/分类随列表滚动，内容透出到标题栏后面（VHome 同款）；
     // 首项 spacer 承担避让，随内容滚走 → IMMERSIVE_GRADIENT_BLUR 有真实内容可采样
+    Stack() {
     List({ scroller: this.pageScroller, space: 12 }) {
       // 首项避让 spacer：状态栏 + MINI 顶栏高度
       ListItem() {
@@ -185,8 +188,41 @@ export struct MenuLibraryTab {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 16 })
+    .padding({ left: 16, right: 30 })
     .edgeEffect(EdgeEffect.Spring)
+
+    // 右侧字母筛选条（点击筛选/再点还原）
+    if (this.allRecipes.length > 0) {
+      Column() {
+        this.LetterRail()
+      }
+      .alignItems(HorizontalAlign.End)
+      .margin({ right: 2 })
+    }
+    }
+    .width('100%')
+    .height('100%')
+    .alignContent(Alignment.End)
+  }
+
+  /** 拼音首字母：英文直接取，中文用 localeCompare 落到 A-Z 桶，其它归 # */
+  private firstLetter(name: string): string {
+    const c: string = name.charAt(0).toUpperCase();
+    if (c >= 'A' && c <= 'Z') {
+      return c;
+    }
+    const letters: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    if (name.localeCompare('A', 'zh') < 0) {
+      return '#';
+    }
+    for (let i = 0; i < 25; i++) {
+      const lo: string = letters[i];
+      const hi: string = letters[i + 1];
+      if (name.localeCompare(lo, 'zh') >= 0 && name.localeCompare(hi, 'zh') < 0) {
+        return lo;
+      }
+    }
+    return name.localeCompare('Z', 'zh') >= 0 ? 'Z' : '#';
   }
 
   private filtered(): Recipe[] {
@@ -198,8 +234,45 @@ export struct MenuLibraryTab {
       if (this.category !== '全部' && r.category !== this.category) {
         continue;
       }
+      if (this.letterFilter.length > 0 && this.firstLetter(r.name) !== this.letterFilter) {
+        continue;
+      }
       list.push(r);
     }
+    // 按拼音首字母排序（localeCompare 中文排序）
+    list.sort((a: Recipe, b: Recipe): number => {
+      const la: string = this.firstLetter(a.name);
+      const lb: string = this.firstLetter(b.name);
+      if (la !== lb) {
+        return la < lb ? -1 : 1;
+      }
+      return a.name.localeCompare(b.name, 'zh');
+    });
     return list;
+  }
+
+  /** 右侧字母筛选条 */
+  @Builder
+  LetterRail() {
+    Column({ space: 1 }) {
+      ForEach(['全', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'W', 'X', 'Y', 'Z', '#'],
+        (l: string): void => {
+          Text(l)
+            .fontSize(9)
+            .fontColor(this.letterFilter === l || (l === '全' && this.letterFilter.length === 0)
+              ? $r('app.color.accent') : $r('app.color.text_tertiary'))
+            .fontWeight(this.letterFilter === l || (l === '全' && this.letterFilter.length === 0)
+              ? FontWeight.Bold : FontWeight.Regular)
+            .height(15)
+            .padding({ left: 3, right: 3 })
+            .onClick((): void => {
+              this.letterFilter = l === '全' ? '' : l;
+            })
+        }, (l: string): string => l)
+    }
+    .alignItems(HorizontalAlign.Center)
+    .padding({ top: 6, bottom: 6, left: 2, right: 2 })
+    .borderRadius(12)
+    .backgroundColor($r('app.color.card_background'))
   }
 }

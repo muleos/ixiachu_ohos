@@ -82,7 +82,7 @@ export class Notify {
         wants: [{
           bundleName: 'com.hmos.ixiachu',
           abilityName: 'EntryAbility',
-          parameters: { launchTab: 3 }
+          parameters: { launchTab: 4 }
         }]
       });
       const request: notificationManager.NotificationRequest = {

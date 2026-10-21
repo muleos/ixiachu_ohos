@@ -262,13 +262,17 @@ export struct OrderTab {
               .backgroundColor($r('app.color.page_background'))
             }
 
-            // 营养面板（每人每餐估算）
-            Row() {
-              Text('营养估算（每人每餐）')
-                .fontSize(12).fontColor($r('app.color.text_tertiary'))
-              Blank()
+            // 营养面板（每人每餐估算；两行布局防长文案出框）
+            Column({ space: 4 }) {
+              Row() {
+                Text('营养估算（每人每餐）')
+                  .fontSize(12).fontColor($r('app.color.text_tertiary'))
+                Blank()
+              }
+              .width('100%')
               Text(`${(this.menu as DailyMenu).totalKcal} kcal · 蛋白 ${(this.menu as DailyMenu).protein}g · 脂肪 ${(this.menu as DailyMenu).fat}g · 碳水 ${(this.menu as DailyMenu).carbs}g`)
                 .fontSize(11).fontColor($r('app.color.text_secondary'))
+                .width('100%')
             }
             .width('100%')
             .padding({ top: 6, bottom: 6, left: 10, right: 10 })

@@ -35,8 +35,8 @@ class TabDef {
 
 const TABS: TabDef[] = [
   new TabDef(0, '菜单库', $r('sys.symbol.doc_text')),
-  new TabDef(1, '笔记', $r('sys.symbol.grid')),
-  new TabDef(2, '点菜', $r('sys.symbol.list_bullet_square')),
+  new TabDef(1, '点菜', $r('sys.symbol.list_bullet_square')),
+  new TabDef(2, '笔记', $r('sys.symbol.grid')),
   new TabDef(3, '采购', $r('sys.symbol.bag')),
   new TabDef(4, '食材', $r('sys.symbol.folder'))
 ];
@@ -122,31 +122,33 @@ struct MainTab {
     }
   }
 
-  /** 食材管理副标题：城市+实时气温（静默模糊定位自动匹配，纯展示不可点） */
+  /** 食材管理副标题由页面自绘标题行承担 */
   private pantrySub(): string {
     const _r: number = this.weatherRev;
     return Weather.hintText();
   }
 
+  /** 食材管理副标题由页面自绘标题行承担，此函数保留备用 */
   private currentTitle(): string {
     if (this.activeTab === 1) {
-      return '笔记';
+      return '点菜';
     }
     if (this.activeTab === 2) {
-      return '点菜';
+      return '笔记';
     }
     if (this.activeTab === 3) {
       return '采购清单';
     }
     if (this.activeTab === 4) {
-      return '食材管理';
+      // 食材页自绘标题行（大标题+右侧城市天气同排），官方标题留空
+      return '';
     }
     return '菜单库';
   }
 
   /** 笔记页右上角官方 menu：解析链接 + 发布（其余页不占位） */
   private notesMenu(): HdsNavigationMenuContentOptions | undefined {
-    if (this.activeTab !== 1) {
+    if (this.activeTab !== 2) {
       return undefined;
     }
     const importItem: HdsNavigationMenuItemOptions = {
@@ -193,12 +195,12 @@ struct MainTab {
         .tabBar(this.hdsTabBar(TABS[0].icon, TABS[0].label))
 
         TabContent() {
-          NotesTab({ pageScroller: this.inspirationScroller })
+          OrderTab({ pageScroller: this.orderScroller })
         }
         .tabBar(this.hdsTabBar(TABS[1].icon, TABS[1].label))
 
         TabContent() {
-          OrderTab({ pageScroller: this.orderScroller })
+          NotesTab({ pageScroller: this.inspirationScroller })
         }
         .tabBar(this.hdsTabBar(TABS[2].icon, TABS[2].label))
 
@@ -230,8 +232,7 @@ struct MainTab {
       avoidLayoutSafeArea: true,
       content: {
         title: {
-          mainTitle: this.currentTitle(),
-          subTitle: this.activeTab === 4 ? this.pantrySub() : undefined
+          mainTitle: this.currentTitle()
         },
         menu: this.notesMenu(),
         divider: { showType: DividerShowType.OFF }
