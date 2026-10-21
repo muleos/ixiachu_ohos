@@ -1,9 +1,12 @@
 /**
- * 小红书内置浏览器导入（v1.13.3 重构）：
- * 之前 app 用 http 直连小红书被反爬拦截（返回验证页/空页）→ 永远「网页抓取失败」。
- * 改为用真实浏览器内核（ArkWeb）加载笔记页，在页面内取渲染后的完整 DOM/HTML，
- * 复用现有 XhsNoteParser（收藏同款 INITIAL_STATE 深挖）解析，绕过反爬；
- * 会话 Cookie 与 XhsSession 共享，登录/验证在 WebView 内手动通过后即可提取。
+ * 小红书内置浏览器导入（v1.13.4 重构）：
+ * 用真实浏览器内核（ArkWeb）加载笔记页——反爬对浏览器环境无效。
+ * 关键修复：不再取整个 document.outerHTML（小红书页面 3~5MB，runJavaScript 返回超大
+ * 字符串必然被截断/失败 → 解析器拿不到 __INITIAL_STATE__），而是只提取含
+ * window.__INITIAL_STATE__ 的那段 <script> 内联文本（通常 100~500KB，正是
+ * XhsNoteParser 设计解析的原始数据），失败再回退整个 HTML。
+ * 会话 Cookie 与 XhsSession 共享：若页面需要登录/验证，在 WebView 内手动通过，
+ * 或点「去小红书登录」走 XhsSession 后再提取即可。
  * 支持 mode=recipe（导入菜谱）/ mode=note（存入笔记）。
  */
 import { router, promptAction } from '@kit.ArkUI';
@@ -24,8 +27,17 @@ import { topAvoid } from '../utils/Theme';
 const XHS_UA: string =
   'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36 xiaohongshu';
 
-/** 在页面内取完整 HTML（含 window.__INITIAL_STATE__ 脚本），供解析器深挖 */
-const EXTRACT_HTML_JS: string = 'document.documentElement.outerHTML';
+/**
+ * 只取含 __INITIAL_STATE__ 的 <script> 内联文本（不取整页 outerHTML）。
+ * 返回的是脚本内容本身（不含 <script> 标签），解析时再包回 <script>…</script>。
+ */
+const EXTRACT_STATE_JS: string =
+  `(function(){try{var s=document.querySelectorAll('script');` +
+  `for(var i=0;i<s.length;i++){var t=s[i].textContent;if(t&&t.indexOf('window.__INITIAL_STATE__')>=0){return t;}}}` +
+  `catch(e){}return '';})()`;
+
+/** 回退方案：整页 HTML（体积大，成功率低，但部分笔记可能仍有 state） */
+const EXTRACT_OUTER_JS: string = 'document.documentElement.outerHTML';
 
 @Entry
 @Component
@@ -37,6 +49,7 @@ struct XhsImport {
   @State mode: string = 'recipe'; // recipe | note
   @State pageLoaded: boolean = false;
   @State extracting: boolean = false;
+  @State showLoginHint: boolean = false;
   @State tip: string = '在下方打开小红书笔记，通过验证后点「提取并导入」';
 
   aboutToAppear(): void {
@@ -82,6 +95,7 @@ struct XhsImport {
           })
           .onPageEnd((): void => {
             this.pageLoaded = true;
+            this.showLoginHint = false;
           })
       }
 
@@ -96,6 +110,7 @@ struct XhsImport {
             .fontSize(14)
             .onClick((): void => {
               this.pageLoaded = false;
+              this.showLoginHint = false;
               this.tip = '正在重新加载…';
               try {
                 this.controller.refresh();
@@ -114,6 +129,16 @@ struct XhsImport {
             })
         }
         .width('100%')
+        if (this.showLoginHint) {
+          Button('去小红书登录 / 获取凭证')
+            .width('100%').height(40).borderRadius(20)
+            .backgroundColor($r('app.color.page_background'))
+            .fontColor($r('app.color.accent'))
+            .fontSize(13)
+            .onClick((): void => {
+              router.pushUrl({ url: 'pages/XhsSession' });
+            })
+        }
       }
       .width('100%').padding({ left: 16, right: 16, top: 10, bottom: 12 })
       .backgroundColor($r('app.color.page_background'))
@@ -123,16 +148,39 @@ struct XhsImport {
     .backgroundColor($r('app.color.page_background'))
   }
 
-  /** 在 WebView 内取渲染后的 HTML，复用 XhsNoteParser 解析（绕过反爬） */
+  /** 在 WebView 内取 __INITIAL_STATE__ 脚本文本（绕过反爬 + 体积小），失败回退整页 HTML */
   private doExtract(): void {
     if (!this.pageLoaded) {
       promptAction.showToast({ message: '页面尚未加载完成' });
       return;
     }
     this.extracting = true;
+    this.showLoginHint = false;
     this.tip = '正在从页面提取笔记内容…';
     try {
-      this.controller.runJavaScript(EXTRACT_HTML_JS,
+      this.controller.runJavaScript(EXTRACT_STATE_JS,
+        (err: BusinessError, result: string): void => {
+          if (err !== null && err.code !== 0) {
+            this.fallbackOuter();
+            return;
+          }
+          const raw: string = result ?? '';
+          if (raw.length >= 50 && raw.indexOf('window.__INITIAL_STATE__') >= 0) {
+            this.onHtml(raw);
+          } else {
+            // 没取到 state（可能是验证页），回退整页 HTML 再试一次
+            this.fallbackOuter();
+          }
+        });
+    } catch (e) {
+      this.fallbackOuter();
+    }
+  }
+
+  /** 回退：取整个 outerHTML 交给解析器（体积大，作为兜底） */
+  private fallbackOuter(): void {
+    try {
+      this.controller.runJavaScript(EXTRACT_OUTER_JS,
         (err: BusinessError, result: string): void => {
           if (err !== null && err.code !== 0) {
             promptAction.showToast({ message: `提取失败：${err.message}` });
@@ -147,16 +195,23 @@ struct XhsImport {
     }
   }
 
-  private onHtml(html: string): void {
-    if (html.length < 200) {
-      this.tip = '未取到页面内容，请确认笔记已打开并通过验证后重试';
+  private onHtml(raw: string): void {
+    let parseInput: string = raw;
+    // runJavaScript 返回的是 <script> 内联文本（不含标签），包回 <script>…</script> 供解析器定位
+    if (raw.indexOf('<') < 0 && raw.indexOf('window.__INITIAL_STATE__') >= 0) {
+      parseInput = '<script>' + raw + '</script>';
+    }
+    if (parseInput.length < 50) {
+      this.tip = '未读到笔记内容：请先在该页面内登录小红书 / 通过验证，再点「提取并导入」';
+      this.showLoginHint = true;
       this.extracting = false;
       return;
     }
     const noteId: string = XhsUrlParser.extractPostId(this.url);
-    const note = new XhsNoteParser().parse(html, noteId, this.url);
+    const note = new XhsNoteParser().parse(parseInput, noteId, this.url);
     if (note.title.length === 0 && note.description.length === 0 && note.mediaUrls.length === 0) {
-      this.tip = '未能从页面提取到笔记内容，请在 WebView 内通过验证/打开笔记后重新点「提取」';
+      this.tip = '未能从页面提取到笔记内容：请确认笔记已打开，或先登录 / 通过验证后重试';
+      this.showLoginHint = true;
       this.extracting = false;
       return;
     }
@@ -169,7 +224,7 @@ struct XhsImport {
 
   /** 导入菜谱：标题+正文 → RecipeParser → 下配图 → 入库 */
   private async buildRecipe(title: string, desc: string, mediaUrls: string[]): Promise<void> {
-    const fullText: string = `${title}\n\n${desc.length > 0 ? desc + '\n\n' : ''}${desc}`;
+    const fullText: string = (title.length > 0 ? title + '\n\n' : '') + desc;
     const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
     const locals: string[] = [];
     for (const u of mediaUrls) {
