@@ -11,6 +11,7 @@ import {
 } from '@kit.UIDesignKit';
 import { common } from '@kit.AbilityKit';
 import { accentColor, frostTitleStyle } from '../utils/Theme';
+import { Weather } from '../service/Weather';
 import { DataStore } from '../service/DataStore';
 import { MenuLibraryTab } from './tabs/MenuLibraryTab';
 import { NotesTab } from './tabs/NotesTab';
@@ -46,6 +47,8 @@ struct MainTab {
   @StorageProp('isDarkMode') @Watch('onThemeChanged') isDark: boolean = false;
   /** 通知点击透传的目标 Tab（launchTab>=0 时切换；onNewWant 热启动也会触发本 Watch） */
   @StorageProp('launchTab') @Watch('onLaunchTab') launchTab: number = -1;
+  /** 天气刷新广播：食材管理副标题跟随实时气温刷新 */
+  @StorageProp('weatherRev') weatherRev: number = 0;
   @State activeTab: number = 0;
   /** 首启隐私同意（AGC 审核 4.1：未同意前遮罩阻断使用） */
   @State showPrivacy: boolean = DataStore.getSetting('privacy_agreed') !== '1';
@@ -119,6 +122,12 @@ struct MainTab {
     }
   }
 
+  /** 食材管理副标题：城市+实时气温（静默模糊定位自动匹配，纯展示不可点） */
+  private pantrySub(): string {
+    const _r: number = this.weatherRev;
+    return Weather.hintText();
+  }
+
   private currentTitle(): string {
     if (this.activeTab === 1) {
       return '笔记';
@@ -130,8 +139,7 @@ struct MainTab {
       return '采购清单';
     }
     if (this.activeTab === 4) {
-      // 食材页自绘标题行（大标题+右侧城市天气同排），官方标题留空
-      return '';
+      return '食材管理';
     }
     return '菜单库';
   }
@@ -222,7 +230,8 @@ struct MainTab {
       avoidLayoutSafeArea: true,
       content: {
         title: {
-          mainTitle: this.currentTitle()
+          mainTitle: this.currentTitle(),
+          subTitle: this.activeTab === 4 ? this.pantrySub() : undefined
         },
         menu: this.notesMenu(),
         divider: { showType: DividerShowType.OFF }

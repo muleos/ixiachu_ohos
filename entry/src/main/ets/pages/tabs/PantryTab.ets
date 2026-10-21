@@ -1,9 +1,11 @@
 /** 功能四：食材管理 —— 小票识别入库 / 新鲜度(气温+储存状态) / 手动校准 / 消耗记录 */
 import { router } from '@kit.ArkUI';
+import { common } from '@kit.AbilityKit';
 import { ConsumeRecord, FreshLevel, StockItem } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { Freshness } from '../../service/Freshness';
-import { Weather } from '../../service/Weather';
+import { Weather, City } from '../../service/Weather';
+import { LocationService, LocateResult } from '../../service/LocationService';
 import { topAvoid } from '../../utils/Theme';
 import { WidgetSync } from '../../service/WidgetSync';
 import { GlassPill } from '../../components/GlassPill';
@@ -23,65 +25,65 @@ export struct PantryTab {
   @State climate: number = Freshness.monthFactor(new Date());
   /** 气温提示文案（空表示月份代理） */
   @State climateText: string = '';
-  @State showCity: boolean = false;
+
+  private located: boolean = false;
 
   aboutToAppear(): void {
     this.reload();
     this.refreshClimate();
+    this.silentLocate();
+  }
+
+  /** 静默获取当地模糊位置（每次进入一次）：就近匹配城市并拉实时气温，失败不打扰 */
+  private silentLocate(): void {
+    if (this.located) {
+      return;
+    }
+    this.located = true;
+    try {
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      LocationService.locate(ctx).then((r: LocateResult): void => {
+        if (r.ok) {
+          const near: City = Weather.nearestCity(r.lat, r.lon);
+          Weather.setAuto(near.name, r.lat, r.lon);
+          this.climateText = '';
+          this.refreshClimate();
+        }
+      });
+    } catch (e) {
+      // 定位失败静默：副标题回退季节提示
+    }
   }
 
   build() {
     Stack() {
       // v1.9.0 沉浸光感：操作行并入列表首项，内容透出到标题栏后面
       List({ scroller: this.pageScroller, space: 10 }) {
-        // 首项：自绘标题行（大标题 + 右侧小字城市天气，同行对齐）+ 操作按钮行
+        // 首项：避让 spacer + 操作按钮行（标题/天气走官方标题栏副标题）
         ListItem() {
-          Column({ space: 12 }) {
-            // 标题行：与右侧城市天气对齐，天气字号更小
-            Row() {
-              Text('食材管理')
-                .fontSize(28).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
-              Blank()
-              Row({ space: 4 }) {
-                SymbolGlyph($r('sys.symbol.thermometer'))
-                  .fontSize(13).fontColor([$r('app.color.accent')])
-                Text(this.cityTempText())
-                  .fontSize(13).fontColor($r('app.color.text_secondary'))
-                SymbolGlyph($r('sys.symbol.chevron_down'))
-                  .fontSize(11).fontColor([$r('app.color.text_tertiary')])
+          Row() {
+            GlassPill({
+              icon: $r('sys.symbol.square_and_pencil'),
+              label: '录入',
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/StockManual' });
               }
-              .onClick((): void => {
-                this.showCity = true;
-              })
-            }
-            .width('100%')
-
-            // 操作行
-            Row() {
-              GlassPill({
-                icon: $r('sys.symbol.square_and_pencil'),
-                label: '录入',
-                onTap: (): void => {
-                  router.pushUrl({ url: 'pages/StockManual' });
-                }
-              })
-              GlassPill({
-                icon: $r('sys.symbol.picture'),
-                label: '拍小票',
-                onTap: (): void => {
-                  router.pushUrl({ url: 'pages/ReceiptScan' });
-                }
-              }).margin({ left: 8 })
-              Blank()
-              GlassPill({
-                icon: $r('sys.symbol.gearshape'),
-                fixedWidth: 44,
-                onTap: (): void => {
-                  router.pushUrl({ url: 'pages/Settings' });
-                }
-              })
-            }
-            .width('100%')
+            })
+            GlassPill({
+              icon: $r('sys.symbol.picture'),
+              label: '拍小票',
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/ReceiptScan' });
+              }
+            }).margin({ left: 10 })
+            Blank()
+            GlassPill({
+              icon: $r('sys.symbol.gearshape'),
+              fixedWidth: 44,
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/Settings' });
+              }
+            })
           }
           .width('100%')
           .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })
@@ -222,42 +224,6 @@ export struct PantryTab {
       })
     }
     // 城市切换弹层（气温系数按城市取）
-    if (this.showCity) {
-      Column()
-        .width('100%')
-        .height('100%')
-        .backgroundColor('rgba(0,0,0,0.4)')
-        .onClick((): void => {
-          this.showCity = false;
-        })
-      Column({ space: 12 }) {
-        Text('选择城市（用于气温修正新鲜度）').fontSize(15).fontWeight(FontWeight.Medium)
-          .fontColor($r('app.color.text_primary')).width('100%')
-        Flex({ wrap: FlexWrap.Wrap, justifyContent: FlexAlign.Start }) {
-          ForEach(Weather.cities(), (c: string): void => {
-            Button(c).fontSize(13).height(32).borderRadius(16)
-              .margin({ right: 8, bottom: 8 })
-              .fontColor(Weather.currentCity() === c ? Color.White : $r('app.color.text_secondary'))
-              .backgroundColor(Weather.currentCity() === c ? $r('app.color.accent') : $r('app.color.page_background'))
-              .onClick((): void => {
-                Weather.setCity(c);
-                this.showCity = false;
-                this.climateText = '';
-                this.refreshClimate();
-              })
-          }, (c: string): string => c)
-        }
-        .width('100%')
-      }
-      .padding(20)
-      .borderRadius(18)
-      .backgroundColor($r('app.color.card_background'))
-      // Stack 下 width('100%') 会让 margin 溢出失效，改 calc：左右各 24vp
-      .width('calc(100% - 48vp)')
-      .onClick((): void => {
-        // 阻断冒泡，避免点弹窗内容关闭
-      })
-    }
     }
     .width('100%')
     .height('100%')
@@ -276,27 +242,11 @@ export struct PantryTab {
       this.reload();
     }
     this.climateText = Weather.hintText();
+    // 广播：MainTab 标题副标题（食材管理天气）跟随刷新
+    AppStorage.setOrCreate<number>('weatherRev', Date.now());
   }
 
-  /** 顶部提示：临期优先，其次气温状态 */
-  private hintText(): string {
-    if (this.soonCount() > 0) {
-      return `${this.soonCount()} 项食材临期，建议优先食用${this.climateText.length > 0 ? ` · ${this.climateText}` : ''}`;
-    }
-    return this.climateText.length > 0
-      ? `${this.climateText} · 点菜时自动扣减库存（点此换城市）`
-      : '按采购日期与气候估算新鲜程度；点菜时自动扣减库存';
-  }
 
-  /** 城市天气短文案（右侧胶囊展示） */
-  private cityTempText(): string {
-    const t: number = Weather.cachedTemp();
-    const city: string = Weather.currentCity();
-    if (t === -999) {
-      return `${city} · 点击切换`;
-    }
-    return `${city} ${Math.round(t)}°C`;
-  }
 
 
 
