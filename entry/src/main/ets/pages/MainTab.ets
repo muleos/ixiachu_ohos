@@ -140,7 +140,8 @@ struct MainTab {
       return '采购清单';
     }
     if (this.activeTab === 4) {
-      return '食材管理';
+      // 食材页自绘标题行（标题+天气+设置同排），官方标题留空
+      return '';
     }
     return '菜单库';
   }
@@ -231,8 +232,7 @@ struct MainTab {
       avoidLayoutSafeArea: true,
       content: {
         title: {
-          mainTitle: this.currentTitle(),
-          subTitle: this.activeTab === 4 ? this.pantryWeather() : undefined
+          mainTitle: this.currentTitle()
         },
         menu: this.notesMenu(),
         divider: { showType: DividerShowType.OFF }

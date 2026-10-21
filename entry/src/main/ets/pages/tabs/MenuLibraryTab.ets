@@ -4,7 +4,6 @@ import { Recipe } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
 import { PinyinUtil } from '../../service/PinyinUtil';
 import { topAvoid } from '../../utils/Theme';
-import { GlassPill } from '../../components/GlassPill';
 
 @Component
 export struct MenuLibraryTab {
@@ -49,14 +48,15 @@ export struct MenuLibraryTab {
       }
       .padding({ top: topAvoid(this.statusBarHeight) })
 
-      // 操作行：搜索 + 导入入口
+      // 操作行：酷安风——搜索长胶囊 + 右侧圆形按钮
       ListItem() {
-        Row() {
+        Row({ space: 10 }) {
+          // 搜索长胶囊（白底圆角全、轻投影）
           Row({ space: 8 }) {
             SymbolGlyph($r('sys.symbol.magnifyingglass'))
               .fontSize(16)
               .fontColor([$r('app.color.text_tertiary')])
-            TextInput({ placeholder: '搜索菜名或标签', text: this.keyword })
+            TextInput({ placeholder: '搜索菜名...', text: this.keyword })
               .backgroundColor(Color.Transparent)
               .border({ width: 0 })
               .fontSize(15)
@@ -68,26 +68,41 @@ export struct MenuLibraryTab {
               })
           }
           .layoutWeight(1)
-          .height(40)
-          .padding({ left: 14, right: 14 })
-          .borderRadius(20)
+          .height(42)
+          .padding({ left: 16, right: 16 })
+          .borderRadius(21)
           .backgroundColor($r('app.color.card_background'))
+          .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
 
-          GlassPill({
-            icon: $r('sys.symbol.picture'),
-            label: '识别',
-            onTap: (): void => {
-              router.pushUrl({ url: 'pages/MenuScan' });
-            }
-          }).margin({ left: 10 })
+          // 识别（圆形按钮）
+          Row() {
+            SymbolGlyph($r('sys.symbol.picture'))
+              .fontSize(19).fontColor([$r('app.color.text_primary')])
+          }
+          .width(42)
+          .height(42)
+          .justifyContent(FlexAlign.Center)
+          .borderRadius(21)
+          .backgroundColor($r('app.color.card_background'))
+          .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
+          .onClick((): void => {
+            router.pushUrl({ url: 'pages/MenuScan' });
+          })
 
-          GlassPill({
-            icon: $r('sys.symbol.plus_circle'),
-            label: '导入',
-            onTap: (): void => {
-              router.pushUrl({ url: 'pages/RecipeImport' });
-            }
-          }).margin({ left: 10 })
+          // 导入（圆形按钮）
+          Row() {
+            SymbolGlyph($r('sys.symbol.plus'))
+              .fontSize(19).fontColor([$r('app.color.text_primary')])
+          }
+          .width(42)
+          .height(42)
+          .justifyContent(FlexAlign.Center)
+          .borderRadius(21)
+          .backgroundColor($r('app.color.card_background'))
+          .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
+          .onClick((): void => {
+            router.pushUrl({ url: 'pages/RecipeImport' });
+          })
         }
         .width('100%')
       }

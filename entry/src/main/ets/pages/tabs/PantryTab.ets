@@ -8,7 +8,6 @@ import { Weather, City } from '../../service/Weather';
 import { LocationService, LocateResult } from '../../service/LocationService';
 import { topAvoid } from '../../utils/Theme';
 import { WidgetSync } from '../../service/WidgetSync';
-import { GlassPill } from '../../components/GlassPill';
 
 @Component
 export struct PantryTab {
@@ -59,31 +58,64 @@ export struct PantryTab {
     Stack() {
       // v1.9.0 沉浸光感：操作行并入列表首项，内容透出到标题栏后面
       List({ scroller: this.pageScroller, space: 10 }) {
-        // 首项：避让 spacer + 操作按钮行（标题/天气在官方标题栏）
+        // 首项：标题行（食材管理 + 右侧天气 + 设置圆钮，酷安风）+ 胶囊操作行
         ListItem() {
-          Row() {
-            GlassPill({
-              icon: $r('sys.symbol.square_and_pencil'),
-              label: '录入',
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/StockManual' });
+          Column({ space: 12 }) {
+            Row() {
+              Text('食材管理')
+                .fontSize(28).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
+              Blank()
+              Text(Weather.hintText())
+                .fontSize(13).fontColor($r('app.color.text_secondary'))
+                .maxLines(1)
+                .margin({ right: 10 })
+              Row() {
+                SymbolGlyph($r('sys.symbol.gearshape'))
+                  .fontSize(19).fontColor([$r('app.color.text_primary')])
               }
-            })
-            GlassPill({
-              icon: $r('sys.symbol.picture'),
-              label: '拍小票',
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/ReceiptScan' });
-              }
-            }).margin({ left: 10 })
-            Blank()
-            GlassPill({
-              icon: $r('sys.symbol.gearshape'),
-              fixedWidth: 44,
-              onTap: (): void => {
+              .width(42)
+              .height(42)
+              .justifyContent(FlexAlign.Center)
+              .borderRadius(21)
+              .backgroundColor($r('app.color.card_background'))
+              .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
+              .onClick((): void => {
                 router.pushUrl({ url: 'pages/Settings' });
+              })
+            }
+            .width('100%')
+
+            Row({ space: 10 }) {
+              Row({ space: 8 }) {
+                SymbolGlyph($r('sys.symbol.square_and_pencil'))
+                  .fontSize(17).fontColor([$r('app.color.text_primary')])
+                Text('录入').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
               }
-            })
+              .height(42)
+              .padding({ left: 18, right: 18 })
+              .borderRadius(21)
+              .backgroundColor($r('app.color.card_background'))
+              .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
+              .onClick((): void => {
+                router.pushUrl({ url: 'pages/StockManual' });
+              })
+
+              Row({ space: 8 }) {
+                SymbolGlyph($r('sys.symbol.picture'))
+                  .fontSize(17).fontColor([$r('app.color.text_primary')])
+                Text('拍小票').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+              }
+              .height(42)
+              .padding({ left: 18, right: 18 })
+              .borderRadius(21)
+              .backgroundColor($r('app.color.card_background'))
+              .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
+              .onClick((): void => {
+                router.pushUrl({ url: 'pages/ReceiptScan' });
+              })
+              Blank()
+            }
+            .width('100%')
           }
           .width('100%')
           .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })
