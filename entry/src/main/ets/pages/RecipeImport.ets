@@ -11,6 +11,8 @@ import { Recipe } from '../model/Models';
 import { RecipeParser } from '../service/RecipeParser';
 import { DataStore } from '../service/DataStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
+import { XhsResolver, XhsResolveError } from '../service/XhsResolver';
+import { ParsedXhsNote } from '../xhs/XhsNoteParser';
 import { FrostPage } from '../components/FrostPage';
 
 const SAMPLE: string = `番茄炒蛋（2人份）
@@ -152,6 +154,11 @@ struct RecipeImport {
     }
     this.importing = true;
     try {
+      // 小红书链接走专用链路（收藏同款：xiaohongshu UA 后缀 + 会话 Cookie + INITIAL_STATE 深挖）
+      if (WebRecipeImporter.isXhsUrl(url)) {
+        await this.doXhsImport(url);
+        return;
+      }
       const page: WebPageContent = await WebRecipeImporter.fetchPage(url);
       if (!page.ok) {
         promptAction.showToast({ message: page.message });
@@ -161,44 +168,84 @@ struct RecipeImport {
         this.importing = false;
         return;
       }
-      // 组装解析文本：标题 + 描述 + 正文（菜名取标题）
-      const fullText: string =
-        `${page.title}\n\n${page.desc.length > 0 ? page.desc + '\n\n' : ''}${page.text}`;
-      this.text = fullText;
-
-      // 下载配图（og:image 优先，最多 3 张随菜谱保存）
-      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
-      const locals: string[] = [];
-      for (const u of page.imageUrls) {
-        if (locals.length >= 3) {
-          break;
-        }
-        const p: string = await WebRecipeImporter.downloadImage(ctx, u);
-        if (p.length > 0) {
-          locals.push(p);
-        }
-      }
-      this.pendingCover = locals.length > 0 ? locals[0] : '';
-      this.pendingImages = locals.slice(1);
-
-      const recipe: Recipe = RecipeParser.parse(fullText, page.title.length > 0 ? page.title : '网页菜谱');
-      if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
-        promptAction.showToast({
-          message: '已抓取网页内容并填入文本框，自动识别不全，请修正「食材/做法」分段后点「识别并入库」'
-        });
-        this.importing = false;
-        return;
-      }
-      this.applyWebMeta(recipe, url);
-      DataStore.saveRecipe(recipe);
-      promptAction.showToast({
-        message: `已导入：${recipe.name}（${recipe.ingredients.length}种食材 / ${recipe.steps.length}步${locals.length > 0 ? ` / ${locals.length}张配图` : ''}）`
-      });
-      router.back();
+      await this.finishImport(page, url);
     } catch (e) {
       promptAction.showToast({ message: `导入失败：${(e as Error).message}` });
     }
     this.importing = false;
+  }
+
+  /** 小红书导入：XhsResolver 解析 → 转成网页内容走统一落库流程 */
+  private async doXhsImport(url: string): Promise<void> {
+    try {
+      const note: ParsedXhsNote = await XhsResolver.resolve(url);
+      const page: WebPageContent = new WebPageContent();
+      page.title = note.title;
+      page.desc = note.description;
+      page.text = note.description;
+      // mediaUrls 里可能混入视频/动图直链，只保留图片供下载
+      for (const u of note.mediaUrls) {
+        if (page.imageUrls.length >= 6) {
+          break;
+        }
+        const lower: string = u.toLowerCase();
+        if (lower.indexOf('.mp4') >= 0 || lower.indexOf('.mov') >= 0) {
+          continue;
+        }
+        if (u.startsWith('http') && page.imageUrls.indexOf(u) < 0) {
+          page.imageUrls.push(u);
+        }
+      }
+      page.ok = page.title.length > 0 || page.desc.length > 0 || page.text.length > 10;
+      if (!page.ok) {
+        promptAction.showToast({ message: '未能解析该小红书笔记内容，可先在笔记导入页获取访问凭证后重试' });
+        this.importing = false;
+        return;
+      }
+      await this.finishImport(page, url);
+    } catch (e) {
+      const err: XhsResolveError = e as XhsResolveError;
+      promptAction.showToast({ message: `小红书解析失败：${err.message ?? '未知错误'}` });
+    }
+    this.importing = false;
+  }
+
+  /** 网页/小红书解析成功后的统一流程：回填文本 → 下配图 → 识别入库 */
+  private async finishImport(page: WebPageContent, url: string): Promise<void> {
+    // 组装解析文本：标题 + 描述 + 正文（菜名取标题）
+    const fullText: string =
+      `${page.title}\n\n${page.desc.length > 0 ? page.desc + '\n\n' : ''}${page.text}`;
+    this.text = fullText;
+
+    // 下载配图（最多 3 张随菜谱保存）
+    const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+    const locals: string[] = [];
+    for (const u of page.imageUrls) {
+      if (locals.length >= 3) {
+        break;
+      }
+      const p: string = await WebRecipeImporter.downloadImage(ctx, u);
+      if (p.length > 0) {
+        locals.push(p);
+      }
+    }
+    this.pendingCover = locals.length > 0 ? locals[0] : '';
+    this.pendingImages = locals.slice(1);
+
+    const recipe: Recipe = RecipeParser.parse(fullText, page.title.length > 0 ? page.title : '网页菜谱');
+    if (recipe.ingredients.length === 0 && recipe.steps.length === 0) {
+      promptAction.showToast({
+        message: '已抓取内容并填入文本框，自动识别不全，请修正「食材/做法」分段后点「识别并入库」'
+      });
+      this.importing = false;
+      return;
+    }
+    this.applyWebMeta(recipe, url);
+    DataStore.saveRecipe(recipe);
+    promptAction.showToast({
+      message: `已导入：${recipe.name}（${recipe.ingredients.length}种食材 / ${recipe.steps.length}步${locals.length > 0 ? ` / ${locals.length}张配图` : ''}）`
+    });
+    router.back();
   }
 
   /** 文本识别入库（携带网页阶段暂存的配图） */
