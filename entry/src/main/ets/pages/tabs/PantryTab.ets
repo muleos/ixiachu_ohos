@@ -59,47 +59,34 @@ export struct PantryTab {
     Stack() {
       // v1.9.0 沉浸光感：操作行并入列表首项，内容透出到标题栏后面
       List({ scroller: this.pageScroller, space: 10 }) {
-        // 首项：标题行（大标题 + 右侧小字天气，只展示）+ 操作按钮行
+        // 首项：操作按钮行（标题在官方标题栏，天气由 MainTab 浮层对齐标题右侧）
         ListItem() {
-          Column({ space: 12 }) {
-            Row() {
-              Text('食材管理')
-                .fontSize(28).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
-              Blank()
-              // 城市天气：放在「食材管理」文字右侧，字体不变（13vp 小字）
-              Text(Weather.hintText())
-                .fontSize(13).fontColor($r('app.color.text_secondary'))
-            }
-            .width('100%')
-
-            Row() {
-              GlassPill({
-                icon: $r('sys.symbol.square_and_pencil'),
-                label: '录入',
-                onTap: (): void => {
-                  router.pushUrl({ url: 'pages/StockManual' });
-                }
-              })
-              GlassPill({
-                icon: $r('sys.symbol.picture'),
-                label: '拍小票',
-                onTap: (): void => {
-                  router.pushUrl({ url: 'pages/ReceiptScan' });
-                }
-              }).margin({ left: 10 })
-              Blank()
-              GlassPill({
-                icon: $r('sys.symbol.gearshape'),
-                fixedWidth: 44,
-                onTap: (): void => {
-                  router.pushUrl({ url: 'pages/Settings' });
-                }
-              })
-            }
-            .width('100%')
+          Row() {
+            GlassPill({
+              icon: $r('sys.symbol.square_and_pencil'),
+              label: '录入',
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/StockManual' });
+              }
+            })
+            GlassPill({
+              icon: $r('sys.symbol.picture'),
+              label: '拍小票',
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/ReceiptScan' });
+              }
+            }).margin({ left: 10 })
+            Blank()
+            GlassPill({
+              icon: $r('sys.symbol.gearshape'),
+              fixedWidth: 44,
+              onTap: (): void => {
+                router.pushUrl({ url: 'pages/Settings' });
+              }
+            })
           }
           .width('100%')
-          .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })
+          .padding({ top: 4, bottom: 4 })
         }
 
         if (this.stock.length === 0) {

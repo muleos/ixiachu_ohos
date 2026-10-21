@@ -49,6 +49,7 @@ struct MainTab {
   @StorageProp('launchTab') @Watch('onLaunchTab') launchTab: number = -1;
   /** 天气刷新广播：食材管理副标题跟随实时气温刷新 */
   @StorageProp('weatherRev') weatherRev: number = 0;
+  @StorageProp('statusBarHeight') statusBarHeight: number = 0;
   @State activeTab: number = 0;
   /** 首启隐私同意（AGC 审核 4.1：未同意前遮罩阻断使用） */
   @State showPrivacy: boolean = DataStore.getSetting('privacy_agreed') !== '1';
@@ -122,13 +123,12 @@ struct MainTab {
     }
   }
 
-  /** 食材管理副标题由页面自绘标题行承担 */
-  private pantrySub(): string {
+  /** 食材管理：标题栏右侧天气浮层文案（与标题同行、字号更小、纯展示） */
+  private pantryWeather(): string {
     const _r: number = this.weatherRev;
     return Weather.hintText();
   }
 
-  /** 食材管理副标题由页面自绘标题行承担，此函数保留备用 */
   private currentTitle(): string {
     if (this.activeTab === 1) {
       return '点菜';
@@ -140,8 +140,7 @@ struct MainTab {
       return '采购清单';
     }
     if (this.activeTab === 4) {
-      // 食材页自绘标题行（大标题+右侧城市天气同排），官方标题留空
-      return '';
+      return '食材管理';
     }
     return '菜单库';
   }
@@ -246,6 +245,20 @@ struct MainTab {
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
+
+    // 食材管理：官方标题栏右侧天气（与标题同行对齐，小字，纯展示不拦截点击）
+    if (this.activeTab === 4 && !this.showPrivacy) {
+      Row() {
+        Blank()
+        Text(this.pantryWeather())
+          .fontSize(13).fontColor($r('app.color.text_secondary'))
+          .maxLines(1)
+      }
+      .width('100%')
+      .height('100%')
+      .padding({ top: this.statusBarHeight + 18, left: 100, right: 16 })
+      .hitTestBehavior(HitTestMode.None)
+    }
 
     // 首启隐私同意弹层（审核 4.1）：同意前阻断使用；可看全文；不同意退出
     if (this.showPrivacy) {

@@ -10,6 +10,7 @@ import { NoteItem } from '../model/Models';
 import { NoteStore } from '../service/NoteStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
 import { XhsResolver } from '../service/XhsResolver';
+import { XhsUrlParser } from '../xhs/XhsUrlParser';
 import { ParsedXhsNote } from '../xhs/XhsNoteParser';
 import { FrostPage } from '../components/FrostPage';
 
@@ -26,26 +27,21 @@ struct NoteImport {
   @State previewSource: string = '';
 
   private async parse(): Promise<void> {
-    const url: string = WebRecipeImporter.normalizeUrl(this.urlInput);
-    if (url.length === 0) {
-      promptAction.showToast({ message: '请先粘贴帖子链接' });
+    const links: string[] = XhsUrlParser.extractLinks(this.urlInput);
+    if (links.length === 0) {
+      promptAction.showToast({ message: '未识别到链接，请粘贴包含 xiaohongshu.com / xhslink.com 的分享文本' });
       return;
     }
+    const url: string = XhsUrlParser.normalizeUrl(links[0]);
     this.parsing = true;
     this.previewTitle = '';
     this.previewDesc = '';
     this.previewImages = [];
-    const isXhs: boolean = WebRecipeImporter.isXhsUrl(url);
+    const isXhs: boolean = WebRecipeImporter.isXhsUrl(links[0]);
     if (isXhs) {
       // 小红书：collection_ohos 完整解析内核（INITIAL_STATE 深挖 + 图组/live-photo）
       try {
         const note: ParsedXhsNote = await XhsResolver.resolve(this.urlInput);
-        // 美食强过滤：文案必须与做饭相关（宽口径），无关内容拒收
-        if (!WebRecipeImporter.isFoodRelated(`${note.title} ${note.description}`)) {
-          promptAction.showToast({ message: '该笔记与美食/做饭无关，未加入笔记' });
-          this.parsing = false;
-          return;
-        }
         const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
         const locals: string[] = [];
         for (const u of note.mediaUrls) {
@@ -150,7 +146,7 @@ struct NoteImport {
               this.parse();
             })
 
-          Text('小红书帖子仅收录与美食/做饭相关的文案内容，无关内容不会加入')
+          Text('支持直接粘贴完整分享文本，自动识别其中链接；内容仅存本机')
             .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%')
 
           // 解析结果预览

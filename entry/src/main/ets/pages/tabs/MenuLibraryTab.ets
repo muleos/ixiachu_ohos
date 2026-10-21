@@ -2,6 +2,7 @@
 import { router } from '@kit.ArkUI';
 import { Recipe } from '../../model/Models';
 import { DataStore } from '../../service/DataStore';
+import { PinyinUtil } from '../../service/PinyinUtil';
 import { topAvoid } from '../../utils/Theme';
 import { GlassPill } from '../../components/GlassPill';
 
@@ -14,6 +15,7 @@ export struct MenuLibraryTab {
   @State category: string = '全部';
   /** 字母筛选（空=全部）；菜谱按拼音首字母排序 */
   @State letterFilter: string = '';
+  @StorageProp('isDarkMode') isDark: boolean = false;
   /** 菜谱列表用 @State 承载，dataRev 变化（种入/导入）后自动刷新 */
   @State allRecipes: Recipe[] = [];
 
@@ -188,8 +190,9 @@ export struct MenuLibraryTab {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 16, right: 30 })
+    .padding({ left: 12, right: 30 })
     .edgeEffect(EdgeEffect.Spring)
+    .scrollBar(BarState.Off)
 
     // 右侧字母筛选条（点击筛选/再点还原）
     if (this.allRecipes.length > 0) {
@@ -205,24 +208,9 @@ export struct MenuLibraryTab {
     .alignContent(Alignment.End)
   }
 
-  /** 拼音首字母：英文直接取，中文用 localeCompare 落到 A-Z 桶，其它归 # */
+  /** 拼音首字母：i18n 音译器（Any-Latin）可靠取首字母 */
   private firstLetter(name: string): string {
-    const c: string = name.charAt(0).toUpperCase();
-    if (c >= 'A' && c <= 'Z') {
-      return c;
-    }
-    const letters: string = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    if (name.localeCompare('A', 'zh') < 0) {
-      return '#';
-    }
-    for (let i = 0; i < 25; i++) {
-      const lo: string = letters[i];
-      const hi: string = letters[i + 1];
-      if (name.localeCompare(lo, 'zh') >= 0 && name.localeCompare(hi, 'zh') < 0) {
-        return lo;
-      }
-    }
-    return name.localeCompare('Z', 'zh') >= 0 ? 'Z' : '#';
+    return PinyinUtil.firstLetter(name);
   }
 
   private filtered(): Recipe[] {
@@ -246,7 +234,14 @@ export struct MenuLibraryTab {
       if (la !== lb) {
         return la < lb ? -1 : 1;
       }
-      return a.name.localeCompare(b.name, 'zh');
+      try {
+        const cmp: number = a.name.localeCompare(b.name, 'zh');
+        if (cmp !== 0) {
+          return cmp;
+        }
+      } catch (e) {
+      }
+      return a.name < b.name ? -1 : 1;
     });
     return list;
   }
@@ -255,15 +250,15 @@ export struct MenuLibraryTab {
   @Builder
   LetterRail() {
     Column({ space: 1 }) {
-      ForEach(['全', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'Q', 'R', 'S', 'T', 'W', 'X', 'Y', 'Z', '#'],
+      ForEach(['全', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '#'],
         (l: string): void => {
           Text(l)
-            .fontSize(9)
+            .fontSize(8)
             .fontColor(this.letterFilter === l || (l === '全' && this.letterFilter.length === 0)
               ? $r('app.color.accent') : $r('app.color.text_tertiary'))
             .fontWeight(this.letterFilter === l || (l === '全' && this.letterFilter.length === 0)
               ? FontWeight.Bold : FontWeight.Regular)
-            .height(15)
+            .height(13)
             .padding({ left: 3, right: 3 })
             .onClick((): void => {
               this.letterFilter = l === '全' ? '' : l;
@@ -271,8 +266,9 @@ export struct MenuLibraryTab {
         }, (l: string): string => l)
     }
     .alignItems(HorizontalAlign.Center)
-    .padding({ top: 6, bottom: 6, left: 2, right: 2 })
+    .padding({ top: 4, bottom: 4, left: 2, right: 2 })
     .borderRadius(12)
-    .backgroundColor($r('app.color.card_background'))
+    // 偏透明玻璃底（参考桌面字母索引样式）
+    .backgroundColor(this.isDark ? '#26FFFFFF' : '#99FFFFFF')
   }
 }
