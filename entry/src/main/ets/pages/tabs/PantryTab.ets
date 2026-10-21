@@ -34,46 +34,54 @@ export struct PantryTab {
     Stack() {
       // v1.9.0 沉浸光感：操作行并入列表首项，内容透出到标题栏后面
       List({ scroller: this.pageScroller, space: 10 }) {
-        // 首项：避让 spacer + 操作按钮行，右侧=城市天气胶囊（点击切换城市）
+        // 首项：自绘标题行（大标题 + 右侧小字城市天气，同行对齐）+ 操作按钮行
         ListItem() {
-          Row() {
-            GlassPill({
-              icon: $r('sys.symbol.square_and_pencil'),
-              label: '录入',
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/StockManual' });
+          Column({ space: 12 }) {
+            // 标题行：与右侧城市天气对齐，天气字号更小
+            Row() {
+              Text('食材管理')
+                .fontSize(28).fontWeight(FontWeight.Bold).fontColor($r('app.color.text_primary'))
+              Blank()
+              Row({ space: 4 }) {
+                SymbolGlyph($r('sys.symbol.thermometer'))
+                  .fontSize(13).fontColor([$r('app.color.accent')])
+                Text(this.cityTempText())
+                  .fontSize(13).fontColor($r('app.color.text_secondary'))
+                SymbolGlyph($r('sys.symbol.chevron_down'))
+                  .fontSize(11).fontColor([$r('app.color.text_tertiary')])
               }
-            })
-            GlassPill({
-              icon: $r('sys.symbol.picture'),
-              label: '拍小票',
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/ReceiptScan' });
-              }
-            }).margin({ left: 8 })
-            Blank()
-            // 城市天气（食材管理右上侧）：点击切换城市
-            Row({ space: 4 }) {
-              SymbolGlyph($r('sys.symbol.thermometer'))
-                .fontSize(13).fontColor([$r('app.color.accent')])
-              Text(this.cityTempText())
-                .fontSize(12).fontColor($r('app.color.text_secondary'))
-              SymbolGlyph($r('sys.symbol.chevron_down'))
-                .fontSize(11).fontColor([$r('app.color.text_tertiary')])
+              .onClick((): void => {
+                this.showCity = true;
+              })
             }
-            .padding({ left: 10, right: 8, top: 10, bottom: 10 })
-            .borderRadius(20)
-            .backgroundColor($r('app.color.card_background'))
-            .onClick((): void => {
-              this.showCity = true;
-            })
-            GlassPill({
-              icon: $r('sys.symbol.gearshape'),
-              fixedWidth: 44,
-              onTap: (): void => {
-                router.pushUrl({ url: 'pages/Settings' });
-              }
-            }).margin({ left: 8 })
+            .width('100%')
+
+            // 操作行
+            Row() {
+              GlassPill({
+                icon: $r('sys.symbol.square_and_pencil'),
+                label: '录入',
+                onTap: (): void => {
+                  router.pushUrl({ url: 'pages/StockManual' });
+                }
+              })
+              GlassPill({
+                icon: $r('sys.symbol.picture'),
+                label: '拍小票',
+                onTap: (): void => {
+                  router.pushUrl({ url: 'pages/ReceiptScan' });
+                }
+              }).margin({ left: 8 })
+              Blank()
+              GlassPill({
+                icon: $r('sys.symbol.gearshape'),
+                fixedWidth: 44,
+                onTap: (): void => {
+                  router.pushUrl({ url: 'pages/Settings' });
+                }
+              })
+            }
+            .width('100%')
           }
           .width('100%')
           .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })

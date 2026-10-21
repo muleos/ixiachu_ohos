@@ -130,7 +130,8 @@ struct MainTab {
       return '采购清单';
     }
     if (this.activeTab === 4) {
-      return '食材管理';
+      // 食材页自绘标题行（大标题+右侧城市天气同排），官方标题留空
+      return '';
     }
     return '菜单库';
   }
