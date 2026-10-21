@@ -190,7 +190,7 @@ export struct MenuLibraryTab {
     }
     .width('100%')
     .height('100%')
-    .padding({ left: 12, right: 30 })
+    .padding({ left: 12, right: 12 })
     .edgeEffect(EdgeEffect.Spring)
     .scrollBar(BarState.Off)
 
@@ -200,7 +200,7 @@ export struct MenuLibraryTab {
         this.LetterRail()
       }
       .alignItems(HorizontalAlign.End)
-      .margin({ right: 2 })
+      .margin({ right: 4 })
     }
     }
     .width('100%')
@@ -268,7 +268,9 @@ export struct MenuLibraryTab {
     .alignItems(HorizontalAlign.Center)
     .padding({ top: 4, bottom: 4, left: 2, right: 2 })
     .borderRadius(12)
-    // 偏透明玻璃底（参考桌面字母索引样式）
-    .backgroundColor(this.isDark ? '#26FFFFFF' : '#99FFFFFF')
+    // 毛玻璃悬浮：模糊透明背景（参考桌面字母索引样式）
+    .backgroundBlurStyle(BlurStyle.COMPONENT_REGULAR)
+    .backgroundColor(this.isDark ? '#1AFFFFFF' : '#59FFFFFF')
+    .shadow({ radius: 8, color: '#22000000', offsetY: 2 })
   }
 }
