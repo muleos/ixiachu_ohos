@@ -12,6 +12,8 @@ struct NoteDetail {
   /** 详情数据镜像：notesRev 变化即重载，评论/点赞实时刷新 */
   @State noteData: NoteItem = new NoteItem();
   @State commentInput: string = '';
+  /** 评论输入框默认隐藏，点评论按钮展示（小红书同款） */
+  @State showInput: boolean = false;
 
   aboutToAppear(): void {
     this.loadNote();
@@ -30,6 +32,13 @@ struct NoteDetail {
   private dateText(t: number): string {
     const d: Date = new Date(t);
     return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`;
+  }
+
+  /** 评论时间：精确到秒 */
+  private commentTime(t: number): string {
+    const d: Date = new Date(t);
+    const p = (v: number): string => v < 10 ? `0${v}` : `${v}`;
+    return `${d.getMonth() + 1}月${d.getDate()}日 ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
   }
 
   private sendComment(): void {
@@ -137,6 +146,13 @@ struct NoteDetail {
               Text(`评论 ${this.noteData.comments.length}`)
                 .fontSize(13).fontColor($r('app.color.text_secondary'))
             }
+            .onClick((): void => {
+              // 小红书同款：点评论按钮展开输入框并定位到评论区
+              this.showInput = !this.showInput;
+              if (this.showInput) {
+                this.scroller.scrollEdge(Edge.Bottom);
+              }
+            })
           }
           .width('100%')
           .padding(12)
@@ -156,7 +172,18 @@ struct NoteDetail {
           Column({ space: 8 }) {
             ForEach(this.noteData.comments, (c: NoteComment): void => {
               Column({ space: 4 }) {
-                Text(this.dateText(c.time)).fontSize(10).fontColor($r('app.color.text_tertiary'))
+                Row() {
+                  Text(this.commentTime(c.time)).fontSize(10).fontColor($r('app.color.text_tertiary'))
+                  Blank()
+                  // 自己发布的评论：删除按钮
+                  SymbolGlyph($r('sys.symbol.trash'))
+                    .fontSize(13)
+                    .fontColor([$r('app.color.text_tertiary')])
+                    .onClick((): void => {
+                      NoteStore.removeComment(AppStorage.get<string>('currentNoteId') ?? '', c.id);
+                    })
+                }
+                .width('100%')
                 Text(c.text).fontSize(13).fontColor($r('app.color.text_primary')).width('100%')
               }
               .alignItems(HorizontalAlign.Start)
@@ -168,38 +195,40 @@ struct NoteDetail {
           }
           .width('100%')
 
-          // 评论输入（随内容流，无悬浮层；键盘 RESIZE 不顶飞页面）
-          Column() {
-            Row({ space: 10 }) {
-              TextInput({ placeholder: '说点什么…', text: this.commentInput })
-                .layoutWeight(1)
-                .height(40).fontSize(14)
-                .fontColor($r('app.color.text_primary'))
-                .placeholderColor($r('app.color.text_tertiary'))
-                .backgroundColor($r('app.color.page_background'))
-                .borderRadius(20)
-                .onChange((v: string): void => {
-                  this.commentInput = v;
-                })
-                .onSubmit((): void => {
-                  this.sendComment();
-                })
-              Button('发送')
-                .height(40).borderRadius(20)
-                .padding({ left: 18, right: 18 })
-                .backgroundColor($r('app.color.accent'))
-                .fontColor(Color.White)
-                .fontSize(14)
-                .onClick((): void => {
-                  this.sendComment();
-                })
+          // 评论输入（默认隐藏，点评论按钮展开；随内容流不顶飞页面）
+          if (this.showInput) {
+            Column() {
+              Row({ space: 10 }) {
+                TextInput({ placeholder: '说点什么…', text: this.commentInput })
+                  .layoutWeight(1)
+                  .height(40).fontSize(14)
+                  .fontColor($r('app.color.text_primary'))
+                  .placeholderColor($r('app.color.text_tertiary'))
+                  .backgroundColor($r('app.color.page_background'))
+                  .borderRadius(20)
+                  .onChange((v: string): void => {
+                    this.commentInput = v;
+                  })
+                  .onSubmit((): void => {
+                    this.sendComment();
+                  })
+                Button('发送')
+                  .height(40).borderRadius(20)
+                  .padding({ left: 18, right: 18 })
+                  .backgroundColor($r('app.color.accent'))
+                  .fontColor(Color.White)
+                  .fontSize(14)
+                  .onClick((): void => {
+                    this.sendComment();
+                  })
+              }
+              .width('100%')
             }
             .width('100%')
+            .padding(12)
+            .borderRadius(14)
+            .backgroundColor($r('app.color.card_background'))
           }
-          .width('100%')
-          .padding(12)
-          .borderRadius(14)
-          .backgroundColor($r('app.color.card_background'))
         }
         .width('100%')
         .padding({ left: 20, right: 20 })

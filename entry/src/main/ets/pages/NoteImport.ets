@@ -9,6 +9,8 @@ import { image } from '@kit.ImageKit';
 import { NoteItem } from '../model/Models';
 import { NoteStore } from '../service/NoteStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
+import { XhsResolver } from '../service/XhsResolver';
+import { ParsedXhsNote } from '../xhs/XhsNoteParser';
 import { FrostPage } from '../components/FrostPage';
 
 @Entry
@@ -23,7 +25,7 @@ struct NoteImport {
   @State previewImages: string[] = [];
   @State previewSource: string = '';
 
-  private parse(): void {
+  private async parse(): Promise<void> {
     const url: string = WebRecipeImporter.normalizeUrl(this.urlInput);
     if (url.length === 0) {
       promptAction.showToast({ message: '请先粘贴帖子链接' });
@@ -34,28 +36,45 @@ struct NoteImport {
     this.previewDesc = '';
     this.previewImages = [];
     const isXhs: boolean = WebRecipeImporter.isXhsUrl(url);
+    if (isXhs) {
+      // 小红书：collection_ohos 完整解析内核（INITIAL_STATE 深挖 + 图组/live-photo）
+      try {
+        const note: ParsedXhsNote = await XhsResolver.resolve(this.urlInput);
+        // 美食强过滤：文案必须与做饭相关（宽口径），无关内容拒收
+        if (!WebRecipeImporter.isFoodRelated(`${note.title} ${note.description}`)) {
+          promptAction.showToast({ message: '该笔记与美食/做饭无关，未加入笔记' });
+          this.parsing = false;
+          return;
+        }
+        const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+        const locals: string[] = [];
+        for (const u of note.mediaUrls) {
+          if (locals.length >= 9) {
+            break;
+          }
+          const p: string = await WebRecipeImporter.downloadImage(ctx, u);
+          if (p.length > 0) {
+            locals.push(p);
+          }
+        }
+        const author: string = note.userName.length > 0 ? `（@${note.userName}）` : '';
+        this.previewTitle = `${note.title}${author}`;
+        this.previewDesc = note.description;
+        this.previewImages = locals;
+        this.previewSource = '小红书';
+      } catch (e) {
+        promptAction.showToast({ message: (e as Error).message });
+      }
+      this.parsing = false;
+      return;
+    }
     WebRecipeImporter.fetchPage(url).then(async (page: WebPageContent): Promise<void> => {
       if (!page.ok) {
         promptAction.showToast({ message: page.message });
         this.parsing = false;
         return;
       }
-      let content: WebPageContent = page;
-      // 小红书专项提取（INITIAL_STATE JSON：标题/正文/sns-img 图组）
-      if (isXhs) {
-        content = await WebRecipeImporter.fetchXhs(url);
-        if (!content.ok) {
-          promptAction.showToast({ message: content.message });
-          this.parsing = false;
-          return;
-        }
-      }
-      // 小红书强过滤：文案必须与美食/做饭相关（宽口径），否则拒收
-      if (isXhs && !WebRecipeImporter.isFoodRelated(`${content.title} ${content.desc}`)) {
-        promptAction.showToast({ message: '该笔记与美食/做饭无关，未加入笔记' });
-        this.parsing = false;
-        return;
-      }
+      const content: WebPageContent = page;
       // 下载配图到本地（最多 9 张）
       const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
       const locals: string[] = [];
@@ -71,7 +90,7 @@ struct NoteImport {
       this.previewTitle = content.title;
       this.previewDesc = content.desc;
       this.previewImages = locals;
-      this.previewSource = isXhs ? '小红书' : '网页';
+      this.previewSource = '网页';
       this.parsing = false;
     });
   }

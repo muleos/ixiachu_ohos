@@ -55,6 +55,52 @@ export class LocalPricePoint {
 }
 
 export class DataStore {
+
+  /** 价格记录管理：全部食材名 */
+  static localPriceNames(): string[] {
+    return Array.from(DataStore.localPrices.keys()).sort();
+  }
+
+  /** 价格记录管理：某食材的采集点（副本） */
+  static localPricesOf(name: string): LocalPricePoint[] {
+    return (DataStore.localPrices.get(name) ?? []).slice();
+  }
+
+  /** 价格记录管理：手动录入/编辑某食材今日价（元/千克） */
+  static setLocalPrice(name: string, price: number): void {
+    const n: string = name.trim();
+    if (n.length === 0 || price <= 0) {
+      return;
+    }
+    const today: string = DataStore.dateBefore(0);
+    const list: LocalPricePoint[] = DataStore.localPrices.get(n) ?? [];
+    const rest: LocalPricePoint[] = list.filter((p: LocalPricePoint): boolean => p.d !== today);
+    const point: LocalPricePoint = new LocalPricePoint();
+    point.p = price;
+    point.d = today;
+    rest.unshift(point);
+    if (rest.length > LOCAL_PRICE_MAX_PER_NAME) {
+      rest.length = LOCAL_PRICE_MAX_PER_NAME;
+    }
+    DataStore.localPrices.set(n, rest);
+    DataStore.persistLocalPrices();
+  }
+
+  /** 价格记录管理：删除某食材的一条采集点 */
+  static removeLocalPrice(name: string, index: number): void {
+    const list: LocalPricePoint[] | undefined = DataStore.localPrices.get(name);
+    if (list === undefined || index < 0 || index >= list.length) {
+      return;
+    }
+    list.splice(index, 1);
+    if (list.length === 0) {
+      DataStore.localPrices.delete(name);
+    } else {
+      DataStore.localPrices.set(name, list);
+    }
+    DataStore.persistLocalPrices();
+  }
+
   private static store: preferences.Preferences | null = null;
   private static recipes: Recipe[] = [];
   private static menus: DailyMenu[] = [];

@@ -113,6 +113,17 @@ export class NoteStore {
     }
   }
 
+  /** 本地评论删除 */
+  static removeComment(id: string, commentId: string): void {
+    for (const n of NoteStore.notes) {
+      if (n.id === id) {
+        n.comments = n.comments.filter((c: NoteComment): boolean => c.id !== commentId);
+        NoteStore.persist();
+        return;
+      }
+    }
+  }
+
   /** 评论数（卡片角标用） */
   static commentCount(id: string): number {
     for (const n of NoteStore.notes) {

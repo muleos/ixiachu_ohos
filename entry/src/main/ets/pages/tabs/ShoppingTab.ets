@@ -1,4 +1,5 @@
-/** 功能三：采购清单 —— 按点菜汇总 + 当日基础菜价参考区间 */
+/** 功能三：采购清单 —— 按点菜汇总 + 当日基础菜价参考区间 + 总金额/价格记录管理 */
+import { router } from '@kit.ArkUI';
 import { DataStore } from '../../service/DataStore';
 import { ShoppingItem } from '../../model/Models';
 import { topAvoid } from '../../utils/Theme';
@@ -43,20 +44,63 @@ export struct ShoppingTab {
     return `${item.amount} ${item.unit}`;
   }
 
+  /** 本次采购总金额（按各食材预计花费区间累计） */
+  private totalLow(): number {
+    let t: number = 0;
+    for (const it of this.items) {
+      t += it.priceLow;
+    }
+    return t;
+  }
+
+  private totalHigh(): number {
+    let t: number = 0;
+    for (const it of this.items) {
+      t += it.priceHigh;
+    }
+    return t;
+  }
+
+  private totalText(): string {
+    if (this.totalHigh() <= 0) {
+      return '暂无价格参考，点「价格记录」补录';
+    }
+    return `本次采购预计 ¥${this.totalLow().toFixed(1)} ~ ¥${this.totalHigh().toFixed(1)}`;
+  }
+
   build() {
     // v1.9.0 沉浸光感：提示行并入列表首项，内容透出到标题栏后面
     List({ scroller: this.pageScroller, space: 10 }) {
-      // 首项：避让 spacer + 菜价参考行（随内容滚走）
+      // 首项：避让 spacer + 菜价参考/总金额/价格管理入口（随内容滚走）
       ListItem() {
-        Row() {
-          Text(this.priceHint())
-            .fontSize(12).fontColor($r('app.color.text_tertiary'))
-            .layoutWeight(1)
-          Text('清除已购')
-            .fontSize(13).fontColor($r('app.color.accent'))
-            .onClick((): void => {
-              DataStore.clearCheckedShopping();
-            })
+        Column({ space: 8 }) {
+          Row() {
+            Text(this.priceHint())
+              .fontSize(12).fontColor($r('app.color.text_tertiary'))
+              .layoutWeight(1)
+            Text('清除已购')
+              .fontSize(13).fontColor($r('app.color.accent'))
+              .onClick((): void => {
+                DataStore.clearCheckedShopping();
+              })
+          }
+          .width('100%')
+
+          Row() {
+            Text(this.totalText())
+              .fontSize(14).fontWeight(FontWeight.Medium)
+              .fontColor(this.totalHigh() > 0 ? $r('app.color.accent') : $r('app.color.text_tertiary'))
+            Blank()
+            Text('价格记录 ›')
+              .fontSize(13).fontColor($r('app.color.accent'))
+              .onClick((): void => {
+                router.pushUrl({ url: 'pages/PriceManage' });
+              })
+          }
+          .width('100%')
+          .padding(12)
+          .borderRadius(14)
+          .backgroundColor($r('app.color.card_background'))
         }
         .width('100%')
         .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })

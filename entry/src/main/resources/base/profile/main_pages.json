@@ -13,6 +13,7 @@
     "pages/InspirationSeason",
     "pages/NotePublish",
     "pages/NoteDetail",
-    "pages/NoteImport"
+    "pages/NoteImport",
+    "pages/PriceManage"
   ]
 }
