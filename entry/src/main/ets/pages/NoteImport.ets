@@ -9,9 +9,7 @@ import { image } from '@kit.ImageKit';
 import { NoteItem } from '../model/Models';
 import { NoteStore } from '../service/NoteStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
-import { XhsResolver, XhsResolveError } from '../service/XhsResolver';
 import { XhsUrlParser } from '../xhs/XhsUrlParser';
-import { ParsedXhsNote } from '../xhs/XhsNoteParser';
 import { FrostPage } from '../components/FrostPage';
 
 @Entry
@@ -46,31 +44,8 @@ struct NoteImport {
     this.previewImages = [];
     const isXhs: boolean = WebRecipeImporter.isXhsUrl(links[0]);
     if (isXhs) {
-      // 小红书：collection_ohos 完整解析内核（INITIAL_STATE 深挖 + 图组/live-photo）
-      try {
-        const note: ParsedXhsNote = await XhsResolver.resolve(this.urlInput);
-        const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
-        const locals: string[] = [];
-        for (const u of note.mediaUrls) {
-          if (locals.length >= 9) {
-            break;
-          }
-          const p: string = await WebRecipeImporter.downloadImage(ctx, u);
-          if (p.length > 0) {
-            locals.push(p);
-          }
-        }
-        const author: string = note.userName.length > 0 ? `（@${note.userName}）` : '';
-        this.previewTitle = `${note.title}${author}`;
-        this.previewDesc = note.description;
-        this.previewImages = locals;
-        this.previewSource = '小红书';
-      } catch (e) {
-        const err: Error = e as Error;
-        this.lastError = err.message ?? '解析失败';
-        this.failIsXhs = true;
-        this.needCredential = (err as XhsResolveError).needCredential === true;
-      }
+      // 小红书：改用内置浏览器解析页（绕过反爬，复用 XhsNoteParser），更稳
+      router.pushUrl({ url: 'pages/XhsImport', params: { url: links[0], mode: 'note' } });
       this.parsing = false;
       return;
     }

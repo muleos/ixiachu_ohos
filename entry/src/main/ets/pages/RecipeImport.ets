@@ -11,8 +11,6 @@ import { Recipe } from '../model/Models';
 import { RecipeParser } from '../service/RecipeParser';
 import { DataStore } from '../service/DataStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
-import { XhsResolver, XhsResolveError } from '../service/XhsResolver';
-import { ParsedXhsNote } from '../xhs/XhsNoteParser';
 import { FrostPage } from '../components/FrostPage';
 
 const SAMPLE: string = `番茄炒蛋（2人份）
@@ -154,9 +152,10 @@ struct RecipeImport {
     }
     this.importing = true;
     try {
-      // 小红书链接走专用链路（收藏同款：xiaohongshu UA 后缀 + 会话 Cookie + INITIAL_STATE 深挖）
+      // 小红书链接交给内置浏览器解析页（绕过反爬，复用 XhsNoteParser）
       if (WebRecipeImporter.isXhsUrl(url)) {
-        await this.doXhsImport(url);
+        router.pushUrl({ url: 'pages/XhsImport', params: { url: url, mode: 'recipe' } });
+        this.importing = false;
         return;
       }
       const page: WebPageContent = await WebRecipeImporter.fetchPage(url);
@@ -175,42 +174,7 @@ struct RecipeImport {
     this.importing = false;
   }
 
-  /** 小红书导入：XhsResolver 解析 → 转成网页内容走统一落库流程 */
-  private async doXhsImport(url: string): Promise<void> {
-    try {
-      const note: ParsedXhsNote = await XhsResolver.resolve(url);
-      const page: WebPageContent = new WebPageContent();
-      page.title = note.title;
-      page.desc = note.description;
-      page.text = note.description;
-      // mediaUrls 里可能混入视频/动图直链，只保留图片供下载
-      for (const u of note.mediaUrls) {
-        if (page.imageUrls.length >= 6) {
-          break;
-        }
-        const lower: string = u.toLowerCase();
-        if (lower.indexOf('.mp4') >= 0 || lower.indexOf('.mov') >= 0) {
-          continue;
-        }
-        if (u.startsWith('http') && page.imageUrls.indexOf(u) < 0) {
-          page.imageUrls.push(u);
-        }
-      }
-      page.ok = page.title.length > 0 || page.desc.length > 0 || page.text.length > 10;
-      if (!page.ok) {
-        promptAction.showToast({ message: '未能解析该小红书笔记内容，可先在笔记导入页获取访问凭证后重试' });
-        this.importing = false;
-        return;
-      }
-      await this.finishImport(page, url);
-    } catch (e) {
-      const err: XhsResolveError = e as XhsResolveError;
-      promptAction.showToast({ message: `小红书解析失败：${err.message ?? '未知错误'}` });
-    }
-    this.importing = false;
-  }
-
-  /** 网页/小红书解析成功后的统一流程：回填文本 → 下配图 → 识别入库 */
+  /** 网页解析成功后的统一流程：回填文本 → 下配图 → 识别入库 */
   private async finishImport(page: WebPageContent, url: string): Promise<void> {
     // 组装解析文本：标题 + 描述 + 正文（菜名取标题）
     const fullText: string =

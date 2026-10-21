@@ -188,11 +188,17 @@ export class WebRecipeImporter {
   static async downloadImage(ctx: common.UIAbilityContext, url: string): Promise<string> {
     const req: http.HttpRequest = http.createHttp();
     try {
+      // 小红书 CDN 不带 Referer 会 403，补上来源提升配图下载成功率
+      const isXhs: boolean = url.indexOf('xhscdn.com') >= 0 || url.indexOf('xiaohongshu.com') >= 0;
+      const header: Record<string, string> = { 'User-Agent': WebRecipeImporter.UA };
+      if (isXhs) {
+        header['Referer'] = 'https://www.xiaohongshu.com/';
+      }
       const resp: http.HttpResponse = await req.request(url, {
         method: http.RequestMethod.GET,
         connectTimeout: 10000,
         readTimeout: 15000,
-        header: { 'User-Agent': WebRecipeImporter.UA },
+        header: header,
         expectDataType: http.HttpDataType.ARRAY_BUFFER
       });
       if (resp.responseCode !== 200) {
