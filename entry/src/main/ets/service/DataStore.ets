@@ -489,6 +489,29 @@ export class DataStore {
     DataStore.persist(KEY_RECIPES, DataStore.recipes);
   }
 
+  /** 整体替换菜谱库（本地恢复用），存量字段归一 */
+  static setRecipes(list: Recipe[]): void {
+    for (const r of list) {
+      if (r.ingredients === undefined || r.ingredients === null) {
+        r.ingredients = [];
+      }
+      if (r.steps === undefined || r.steps === null) {
+        r.steps = [];
+      }
+      if (r.tags === undefined || r.tags === null) {
+        r.tags = [];
+      }
+      if (r.cover === undefined || r.cover === null) {
+        r.cover = '';
+      }
+      if (r.source === undefined || r.source === null) {
+        r.source = '手动导入';
+      }
+    }
+    DataStore.recipes = list;
+    DataStore.persist(KEY_RECIPES, DataStore.recipes);
+  }
+
   static deleteRecipe(id: string): void {
     DataStore.recipes = DataStore.recipes.filter((r: Recipe): boolean => r.id !== id);
     DataStore.persist(KEY_RECIPES, DataStore.recipes);

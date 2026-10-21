@@ -10,6 +10,8 @@ import {
   HdsNavigation, HdsNavigationTitleMode, DividerShowType
 } from '@kit.UIDesignKit';
 import { DataStore } from '../service/DataStore';
+import { BackupService } from '../service/BackupService';
+import { WidgetSync } from '../service/WidgetSync';
 import { Notify } from '../service/Notify';
 import { Weather, City } from '../service/Weather';
 import { LocationService, LocateResult } from '../service/LocationService';
@@ -53,6 +55,51 @@ struct Settings {
         bundleManager.getBundleInfoForSelfSync(bundleManager.BundleFlag.GET_BUNDLE_INFO_DEFAULT);
       this.versionName = `v${info.versionName}`;
     } catch (e) {
+    }
+  }
+
+  /** 恢复前二次确认（覆盖性操作） */
+  private confirmRestore(): void {
+    promptAction.showDialog({
+      title: '从文件恢复',
+      message: '恢复将覆盖当前的菜单库、笔记、采购清单和食材库存数据，确定继续？',
+      buttons: [
+        { text: '取消', color: '#666666' },
+        { text: '恢复', color: '#ED6D3D' }
+      ]
+    }).then((result: promptAction.ShowDialogSuccessResponse): void => {
+      if (result.index === 1) {
+        this.doImport();
+      }
+    });
+  }
+
+  /** 备份四类数据到本地 JSON 文件（系统保存对话框） */
+  private async doExport(): Promise<void> {
+    try {
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      const uri: string = await BackupService.exportBackup(ctx);
+      if (uri.length === 0) {
+        return;
+      }
+      promptAction.showToast({ message: '备份已保存到所选位置' });
+    } catch (e) {
+      promptAction.showToast({ message: `备份失败：${(e as Error).message}` });
+    }
+  }
+
+  /** 从本地 JSON 恢复（覆盖菜单库/笔记/采购/食材） */
+  private async doImport(): Promise<void> {
+    try {
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      const summary: string = await BackupService.importBackup(ctx);
+      if (summary.length === 0) {
+        return;
+      }
+      WidgetSync.updateAll();
+      promptAction.showToast({ message: `恢复完成：${summary}` });
+    } catch (e) {
+      promptAction.showToast({ message: `恢复失败：${(e as Error).message}` });
     }
   }
 
@@ -126,6 +173,41 @@ struct Settings {
                 .onClick((): void => {
                   this.confirmClearPrices();
                 })
+            }
+            .width('100%').padding(16).borderRadius(16)
+            .backgroundColor($r('app.color.card_background'))
+
+            // 备份与恢复
+            Column({ space: 4 }) {
+              Row({ space: 10 }) {
+                Text('备份与恢复').fontSize(15).fontWeight(FontWeight.Medium).fontColor($r('app.color.text_primary'))
+                Blank()
+              }
+              .width('100%')
+              Text('菜单库 / 笔记（含图片视频）/ 采购清单 / 食材库存 → 本地 JSON 文件；恢复会覆盖这四类当前数据')
+                .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%')
+              Row({ space: 10 }) {
+                Button('备份到本地文件')
+                  .layoutWeight(1)
+                  .height(38).borderRadius(19)
+                  .backgroundColor($r('app.color.accent'))
+                  .fontColor(Color.White)
+                  .fontSize(13)
+                  .onClick((): void => {
+                    this.doExport();
+                  })
+                Button('从文件恢复')
+                  .layoutWeight(1)
+                  .height(38).borderRadius(19)
+                  .backgroundColor($r('app.color.page_background'))
+                  .fontColor($r('app.color.text_primary'))
+                  .fontSize(13)
+                  .onClick((): void => {
+                    this.confirmRestore();
+                  })
+              }
+              .width('100%')
+              .margin({ top: 6 })
             }
             .width('100%').padding(16).borderRadius(16)
             .backgroundColor($r('app.color.card_background'))

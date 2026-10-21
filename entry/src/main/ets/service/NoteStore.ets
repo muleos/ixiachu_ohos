@@ -134,6 +134,36 @@ export class NoteStore {
     return 0;
   }
 
+  /** 整体替换笔记库（本地恢复用，媒体文件已由调用方落盘并回填路径） */
+  static replaceAll(notes: NoteItem[]): void {
+    for (const n of notes) {
+      if (n.mediaPaths === undefined || n.mediaPaths === null) {
+        n.mediaPaths = [];
+      }
+      if (n.videoPath === undefined || n.videoPath === null) {
+        n.videoPath = '';
+      }
+      if (n.text === undefined || n.text === null) {
+        n.text = '';
+      }
+      if (n.comments === undefined || n.comments === null) {
+        n.comments = [];
+      }
+      if (n.liked === undefined || n.liked === null) {
+        n.liked = false;
+      }
+      if (n.source === undefined || n.source === null) {
+        n.source = '本地';
+      }
+      if (!(n.coverW > 0) || !(n.coverH > 0)) {
+        n.coverW = 4;
+        n.coverH = 3;
+      }
+    }
+    NoteStore.notes = notes.sort((a: NoteItem, b: NoteItem): number => b.time - a.time);
+    NoteStore.persist();
+  }
+
   private static persist(): void {
     try {
       (NoteStore.store as preferences.Preferences).putSync(KEY, JSON.stringify(NoteStore.notes));
