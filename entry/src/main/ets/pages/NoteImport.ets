@@ -25,6 +25,9 @@ struct NoteImport {
   @State previewDesc: string = '';
   @State previewImages: string[] = [];
   @State previewSource: string = '';
+  /** 小红书解析失败原因（引导获取访问凭证） */
+  @State lastError: string = '';
+  @State failIsXhs: boolean = false;
 
   private async parse(): Promise<void> {
     const links: string[] = XhsUrlParser.extractLinks(this.urlInput);
@@ -34,6 +37,7 @@ struct NoteImport {
     }
     const url: string = XhsUrlParser.normalizeUrl(links[0]);
     this.parsing = true;
+    this.lastError = '';
     this.previewTitle = '';
     this.previewDesc = '';
     this.previewImages = [];
@@ -59,7 +63,8 @@ struct NoteImport {
         this.previewImages = locals;
         this.previewSource = '小红书';
       } catch (e) {
-        promptAction.showToast({ message: (e as Error).message });
+        this.lastError = (e as Error).message ?? '解析失败';
+        this.failIsXhs = true;
       }
       this.parsing = false;
       return;
@@ -148,6 +153,29 @@ struct NoteImport {
 
           Text('支持直接粘贴完整分享文本，自动识别其中链接；内容仅存本机')
             .fontSize(11).fontColor($r('app.color.text_tertiary')).width('100%')
+
+          // 小红书需要访问凭证时的引导
+          if (this.failIsXhs && this.lastError.length > 0 && this.previewTitle.length === 0) {
+            Column({ space: 10 }) {
+              Text('解析未成功').fontSize(15).fontWeight(FontWeight.Medium)
+                .fontColor($r('app.color.text_primary')).width('100%')
+              Text(this.lastError).fontSize(12).fontColor($r('app.color.text_secondary')).width('100%')
+              Text('部分笔记需要访问凭证：点下方按钮在内置浏览器打开小红书，随便浏览一篇笔记后点「完成」返回，再点「解析」即可。')
+                .fontSize(12).lineHeight(19).fontColor($r('app.color.text_secondary')).width('100%')
+              Button('打开小红书获取凭证')
+                .width('100%')
+                .height(42).borderRadius(21)
+                .backgroundColor($r('app.color.accent'))
+                .fontColor(Color.White)
+                .fontSize(14)
+                .onClick((): void => {
+                  router.pushUrl({ url: 'pages/XhsSession' });
+                })
+            }
+            .width('100%').padding(14).borderRadius(14)
+            .backgroundColor($r('app.color.card_background'))
+            .alignItems(HorizontalAlign.Start)
+          }
 
           // 解析结果预览
           if (this.previewTitle.length > 0 || this.previewDesc.length > 0 || this.previewImages.length > 0) {

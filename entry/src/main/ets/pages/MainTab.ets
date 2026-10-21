@@ -123,7 +123,7 @@ struct MainTab {
     }
   }
 
-  /** 食材管理：标题栏右侧天气浮层文案（与标题同行、字号更小、纯展示） */
+  /** 食材管理副标题：城市+实时气温+影响（静默模糊定位自动匹配，纯展示） */
   private pantryWeather(): string {
     const _r: number = this.weatherRev;
     return Weather.hintText();
@@ -231,7 +231,8 @@ struct MainTab {
       avoidLayoutSafeArea: true,
       content: {
         title: {
-          mainTitle: this.currentTitle()
+          mainTitle: this.currentTitle(),
+          subTitle: this.activeTab === 4 ? this.pantryWeather() : undefined
         },
         menu: this.notesMenu(),
         divider: { showType: DividerShowType.OFF }
@@ -245,20 +246,6 @@ struct MainTab {
     .height('100%')
     .backgroundColor($r('app.color.page_background'))
     .expandSafeArea([SafeAreaType.SYSTEM], [SafeAreaEdge.TOP, SafeAreaEdge.BOTTOM])
-
-    // 食材管理：官方标题栏右侧天气（与标题同行对齐，小字，纯展示不拦截点击）
-    if (this.activeTab === 4 && !this.showPrivacy) {
-      Row() {
-        Blank()
-        Text(this.pantryWeather())
-          .fontSize(13).fontColor($r('app.color.text_secondary'))
-          .maxLines(1)
-      }
-      .width('100%')
-      .height('100%')
-      .padding({ top: this.statusBarHeight + 18, left: 100, right: 16 })
-      .hitTestBehavior(HitTestMode.None)
-    }
 
     // 首启隐私同意弹层（审核 4.1）：同意前阻断使用；可看全文；不同意退出
     if (this.showPrivacy) {

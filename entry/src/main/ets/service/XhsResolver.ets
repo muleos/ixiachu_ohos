@@ -6,6 +6,7 @@
  * 短链跟随重定向后按单笔记对象解析。
  */
 import { http } from '@kit.NetworkKit';
+import { webview } from '@kit.ArkWeb';
 import { ParsedXhsNote } from '../xhs/XhsNoteParser';
 import { XhsNoteParser } from '../xhs/XhsNoteParser';
 import { XhsUrlParser } from '../xhs/XhsUrlParser';
@@ -45,18 +46,33 @@ export class XhsResolver {
   private static fetchHtml(url: string): Promise<string> {
     return new Promise<string>((resolve: (v: string) => void, reject: (e: Error) => void): void => {
       const req: http.HttpRequest = http.createHttp();
+      // 会话 Cookie（收藏同款 useWebSession）：应用内 WebView 访问过小红书即自动携带
+      const header: Record<string, string> = {
+        'User-Agent': XhsResolver.UA,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-CN,zh;q=0.9'
+      };
+      if (url.startsWith('https://')) {
+        try {
+          const cookie: string = webview.WebCookieManager.fetchCookieSync(url) ?? '';
+          if (cookie.length > 0) {
+            header['Cookie'] = cookie;
+          }
+        } catch (e) {
+          // 无会话则匿名访问
+        }
+      }
       req.request(url, {
         method: http.RequestMethod.GET,
         connectTimeout: 10000,
         readTimeout: 20000,
-        header: {
-          'User-Agent': XhsResolver.UA,
-          'Accept': 'text/html,application/xhtml+xml,application/json;q=0.9,*/*;q=0.8'
-        },
+        header: header,
+        usingCache: false,
         expectDataType: http.HttpDataType.STRING
       }).then((resp: http.HttpResponse): void => {
         try {
-          if (resp.responseCode !== 200) {
+          // 2xx-3xx 均接受（重定向链由系统跟随，收藏同款）
+          if (resp.responseCode < 200 || resp.responseCode >= 400) {
             reject(new Error(`小红书返回 ${resp.responseCode}`));
             return;
           }

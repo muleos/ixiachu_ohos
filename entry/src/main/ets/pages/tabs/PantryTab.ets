@@ -59,7 +59,7 @@ export struct PantryTab {
     Stack() {
       // v1.9.0 沉浸光感：操作行并入列表首项，内容透出到标题栏后面
       List({ scroller: this.pageScroller, space: 10 }) {
-        // 首项：操作按钮行（标题在官方标题栏，天气由 MainTab 浮层对齐标题右侧）
+        // 首项：避让 spacer + 操作按钮行（标题/天气在官方标题栏）
         ListItem() {
           Row() {
             GlassPill({
@@ -86,7 +86,7 @@ export struct PantryTab {
             })
           }
           .width('100%')
-          .padding({ top: 4, bottom: 4 })
+          .padding({ top: topAvoid(this.statusBarHeight) + 8, bottom: 4 })
         }
 
         if (this.stock.length === 0) {
