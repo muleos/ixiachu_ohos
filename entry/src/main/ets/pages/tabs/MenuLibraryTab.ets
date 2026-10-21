@@ -14,6 +14,9 @@ export struct MenuLibraryTab {
   @State category: string = '全部';
   /** 字母筛选（空=全部）；菜谱按拼音首字母排序 */
   @State letterFilter: string = '';
+  /** 搜索行默认隐藏，点顶栏搜索按钮展开 */
+  @StorageProp('menuSearchRev') @Watch('onSearchToggle') menuSearchRev: number = 0;
+  @State showSearch: boolean = false;
   @StorageProp('isDarkMode') isDark: boolean = false;
   /** 菜谱列表用 @State 承载，dataRev 变化（种入/导入）后自动刷新 */
   @State allRecipes: Recipe[] = [];
@@ -37,6 +40,13 @@ export struct MenuLibraryTab {
     return set;
   }
 
+  onSearchToggle(): void {
+    this.showSearch = !this.showSearch;
+    if (!this.showSearch) {
+      this.keyword = '';
+    }
+  }
+
   build() {
     // v1.9.0 沉浸光感：搜索/分类随列表滚动，内容透出到标题栏后面（VHome 同款）；
     // 首项 spacer 承担避让，随内容滚走 → IMMERSIVE_GRADIENT_BLUR 有真实内容可采样
@@ -48,7 +58,8 @@ export struct MenuLibraryTab {
       }
       .padding({ top: topAvoid(this.statusBarHeight) })
 
-      // 操作行：酷安风——搜索长胶囊 + 右侧圆形按钮
+      // 搜索行（顶栏搜索按钮展开；酷安风搜索胶囊）
+      if (this.showSearch) {
       ListItem() {
         Row({ space: 10 }) {
           // 搜索长胶囊（白底圆角全、轻投影）
@@ -74,37 +85,9 @@ export struct MenuLibraryTab {
           .backgroundColor($r('app.color.card_background'))
           .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
 
-          // 识别（圆形按钮）
-          Row() {
-            SymbolGlyph($r('sys.symbol.picture'))
-              .fontSize(19).fontColor([$r('app.color.text_primary')])
-          }
-          .width(42)
-          .height(42)
-          .justifyContent(FlexAlign.Center)
-          .borderRadius(21)
-          .backgroundColor($r('app.color.card_background'))
-          .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
-          .onClick((): void => {
-            router.pushUrl({ url: 'pages/MenuScan' });
-          })
-
-          // 导入（圆形按钮）
-          Row() {
-            SymbolGlyph($r('sys.symbol.plus'))
-              .fontSize(19).fontColor([$r('app.color.text_primary')])
-          }
-          .width(42)
-          .height(42)
-          .justifyContent(FlexAlign.Center)
-          .borderRadius(21)
-          .backgroundColor($r('app.color.card_background'))
-          .shadow({ radius: 10, color: '#14000000', offsetY: 2 })
-          .onClick((): void => {
-            router.pushUrl({ url: 'pages/RecipeImport' });
-          })
         }
         .width('100%')
+      }
       }
 
       // 分类筛选 chips

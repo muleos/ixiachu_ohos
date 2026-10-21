@@ -129,6 +129,84 @@ struct MainTab {
     return Weather.hintText();
   }
 
+  /** 顶栏右侧官方沉浸光感圆钮菜单：笔记=解析/发布，菜单库=搜索/拍照/加号，食材=录入/拍小票/设置 */
+  private titleMenu(): HdsNavigationMenuContentOptions | undefined {
+    if (this.activeTab === 2) {
+      const importItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.link')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            router.pushUrl({ url: 'pages/NoteImport' });
+          }
+        }
+      };
+      const publishItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            router.pushUrl({ url: 'pages/NotePublish' });
+          }
+        }
+      };
+      return { value: [importItem, publishItem] };
+    }
+    if (this.activeTab === 0) {
+      const searchItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.magnifyingglass')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            AppStorage.setOrCreate<number>('menuSearchRev', Date.now());
+          }
+        }
+      };
+      const scanItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.picture')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            router.pushUrl({ url: 'pages/MenuScan' });
+          }
+        }
+      };
+      const importItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            router.pushUrl({ url: 'pages/RecipeImport' });
+          }
+        }
+      };
+      return { value: [searchItem, scanItem, importItem] };
+    }
+    if (this.activeTab === 4) {
+      const manualItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.square_and_pencil')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            router.pushUrl({ url: 'pages/StockManual' });
+          }
+        }
+      };
+      const scanItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.picture')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            router.pushUrl({ url: 'pages/ReceiptScan' });
+          }
+        }
+      };
+      const settingItem: HdsNavigationMenuItemOptions = {
+        content: {
+          icon: new SymbolGlyphModifier($r('sys.symbol.gearshape')).fontColor([$r('app.color.text_primary')]),
+          action: (): void => {
+            router.pushUrl({ url: 'pages/Settings' });
+          }
+        }
+      };
+      return { value: [manualItem, scanItem, settingItem] };
+    }
+    return undefined;
+  }
+
   private currentTitle(): string {
     if (this.activeTab === 1) {
       return '点菜';
@@ -140,35 +218,11 @@ struct MainTab {
       return '采购清单';
     }
     if (this.activeTab === 4) {
-      // 食材页自绘标题行（标题+天气+设置同排），官方标题留空
-      return '';
+      return '食材管理';
     }
     return '菜单库';
   }
 
-  /** 笔记页右上角官方 menu：解析链接 + 发布（其余页不占位） */
-  private notesMenu(): HdsNavigationMenuContentOptions | undefined {
-    if (this.activeTab !== 2) {
-      return undefined;
-    }
-    const importItem: HdsNavigationMenuItemOptions = {
-      content: {
-        icon: new SymbolGlyphModifier($r('sys.symbol.link')).fontColor([$r('app.color.text_primary')]),
-        action: (): void => {
-          router.pushUrl({ url: 'pages/NoteImport' });
-        }
-      }
-    };
-    const publishItem: HdsNavigationMenuItemOptions = {
-      content: {
-        icon: new SymbolGlyphModifier($r('sys.symbol.plus')).fontColor([$r('app.color.text_primary')]),
-        action: (): void => {
-          router.pushUrl({ url: 'pages/NotePublish' });
-        }
-      }
-    };
-    return { value: [importItem, publishItem] };
-  }
 
   private hdsTabBar(icon: Resource, label: string): BottomTabBarStyle {
     const normalGlyph: SymbolGlyphModifier = new SymbolGlyphModifier(icon)
@@ -232,9 +286,10 @@ struct MainTab {
       avoidLayoutSafeArea: true,
       content: {
         title: {
-          mainTitle: this.currentTitle()
+          mainTitle: this.currentTitle(),
+          subTitle: this.activeTab === 4 ? this.pantryWeather() : undefined
         },
-        menu: this.notesMenu(),
+        menu: this.titleMenu(),
         divider: { showType: DividerShowType.OFF }
       }
     })
