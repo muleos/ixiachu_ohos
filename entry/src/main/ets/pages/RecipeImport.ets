@@ -11,6 +11,7 @@ import { Recipe } from '../model/Models';
 import { RecipeParser } from '../service/RecipeParser';
 import { DataStore } from '../service/DataStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
+import { XhsResolver, XhsResolveError } from '../service/XhsResolver';
 import { FrostPage } from '../components/FrostPage';
 
 const SAMPLE: string = `番茄炒蛋（2人份）
@@ -152,10 +153,9 @@ struct RecipeImport {
     }
     this.importing = true;
     try {
-      // 小红书链接交给内置浏览器解析页（绕过反爬，复用 XhsNoteParser）
+      // 小红书链接走 XhsResolver 专用链路（与收藏 app 一致：UA 后缀 + WebView 会话 Cookie + INITIAL_STATE 深挖）
       if (WebRecipeImporter.isXhsUrl(url)) {
-        router.pushUrl({ url: 'pages/XhsImport', params: { url: url, mode: 'recipe' } });
-        this.importing = false;
+        await this.doXhsImport(url);
         return;
       }
       const page: WebPageContent = await WebRecipeImporter.fetchPage(url);
@@ -170,6 +170,41 @@ struct RecipeImport {
       await this.finishImport(page, url);
     } catch (e) {
       promptAction.showToast({ message: `导入失败：${(e as Error).message}` });
+    }
+    this.importing = false;
+  }
+
+  /** 小红书导入：XhsResolver 解析 → 转成网页内容走统一落库流程（与收藏 app 同款解析内核） */
+  private async doXhsImport(url: string): Promise<void> {
+    try {
+      const note = await XhsResolver.resolve(url);
+      const page: WebPageContent = new WebPageContent();
+      page.title = note.title;
+      page.desc = note.description;
+      page.text = note.description;
+      // 仅取图片直链（过滤视频），最多 6 张供下游下载
+      for (const u of note.mediaUrls) {
+        if (page.imageUrls.length >= 6) {
+          break;
+        }
+        const lower: string = u.toLowerCase();
+        if (lower.indexOf('.mp4') >= 0 || lower.indexOf('.mov') >= 0) {
+          continue;
+        }
+        if (u.startsWith('http') && page.imageUrls.indexOf(u) < 0) {
+          page.imageUrls.push(u);
+        }
+      }
+      page.ok = page.title.length > 0 || page.desc.length > 0 || page.text.length > 10;
+      if (!page.ok) {
+        promptAction.showToast({ message: '未能解析该小红书笔记内容，可先点「获取访问凭证」登录后重试' });
+        this.importing = false;
+        return;
+      }
+      await this.finishImport(page, url);
+    } catch (e) {
+      const err: XhsResolveError = e as XhsResolveError;
+      promptAction.showToast({ message: `小红书解析失败：${err.message ?? '未知错误'}` });
     }
     this.importing = false;
   }

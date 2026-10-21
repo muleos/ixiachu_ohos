@@ -15,7 +15,6 @@
     "pages/NoteDetail",
     "pages/NoteImport",
     "pages/PriceManage",
-    "pages/XhsSession",
-    "pages/XhsImport"
+    "pages/XhsSession"
   ]
 }

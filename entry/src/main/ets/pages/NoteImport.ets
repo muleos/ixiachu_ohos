@@ -10,6 +10,7 @@ import { NoteItem } from '../model/Models';
 import { NoteStore } from '../service/NoteStore';
 import { WebRecipeImporter, WebPageContent } from '../service/WebRecipeImporter';
 import { XhsUrlParser } from '../xhs/XhsUrlParser';
+import { XhsResolver, XhsResolveError } from '../service/XhsResolver';
 import { FrostPage } from '../components/FrostPage';
 
 @Entry
@@ -44,9 +45,8 @@ struct NoteImport {
     this.previewImages = [];
     const isXhs: boolean = WebRecipeImporter.isXhsUrl(links[0]);
     if (isXhs) {
-      // 小红书：改用内置浏览器解析页（绕过反爬，复用 XhsNoteParser），更稳
-      router.pushUrl({ url: 'pages/XhsImport', params: { url: links[0], mode: 'note' } });
-      this.parsing = false;
+      // 小红书：XhsResolver 专用链路（UA 后缀 + WebView 会话 Cookie + INITIAL_STATE 深挖），与收藏 app 一致
+      await this.doXhsImport(links[0]);
       return;
     }
     WebRecipeImporter.fetchPage(url).then(async (page: WebPageContent): Promise<void> => {
@@ -74,6 +74,35 @@ struct NoteImport {
       this.previewSource = '网页';
       this.parsing = false;
     });
+  }
+
+  /** 小红书导入：XhsResolver 解析 → 下载配图 → 预览（与收藏 app 同款解析内核） */
+  private async doXhsImport(rawLink: string): Promise<void> {
+    try {
+      const note = await XhsResolver.resolve(rawLink);
+      const ctx: common.UIAbilityContext = getContext(this) as common.UIAbilityContext;
+      const locals: string[] = [];
+      for (const u of note.mediaUrls) {
+        if (locals.length >= 9) {
+          break;
+        }
+        const p: string = await WebRecipeImporter.downloadImage(ctx, u);
+        if (p.length > 0) {
+          locals.push(p);
+        }
+      }
+      const author: string = note.userName.length > 0 ? `（@${note.userName}）` : '';
+      this.previewTitle = `${note.title}${author}`;
+      this.previewDesc = note.description;
+      this.previewImages = locals;
+      this.previewSource = '小红书';
+    } catch (e) {
+      const err: XhsResolveError = e as XhsResolveError;
+      this.lastError = err.message ?? '解析失败';
+      this.failIsXhs = true;
+      this.needCredential = err.needCredential === true;
+    }
+    this.parsing = false;
   }
 
   private async saveNote(): Promise<void> {

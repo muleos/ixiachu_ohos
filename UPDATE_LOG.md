@@ -1,5 +1,13 @@
 # I下厨 更新日志
 
+## v1.13.5 (2026-10-21)
+
+### 修复：小红书解析与收藏 app 一致（彻底弃用 WebView 取数）
+- **根因**：此前 v1.13.3/1.13.4 自创的「内置浏览器取 DOM」方案在真机拿不到内容。收藏 app 的真实可用链路是 **`http` 模块发请求（UA 带 `xiaohongshu` 后缀）+ 注入 WebView 共享会话 Cookie + 依赖 http 自动跟随 3xx 重定向**，而非 WebView 取页面 HTML。
+- **XhsResolver 抓取层对齐收藏 `XhsHttpClient`**：① 移除 `expectDataType: STRING`（gzip 响应下该项会让返回串变空，是帖文全空的直接原因）；② 会话 Cookie 改按 host 取 `WebCookieManager.fetchCookieSync('https://www.xiaohongshu.com')`（原用整 URL 常取不到）；③ 成功判定 `200≤code<400 且 文本非空`，依赖 http 默认重定向跟随。
+- **导入菜谱 / 笔记解析页的小红书分支全部切回 `XhsResolver`**（移除 WebView 路由 `pages/XhsImport` 及其文件），下游复用原落库流程（回填文本 / 下配图 / 识别入库 / 存笔记）。
+- 解析内核（`xhs/XhsNoteParser` / `XhsUrlParser` / `JsonNode` / `models`）此前已是收藏 1:1 移植，本次未动。
+
 ## v1.13.4 (2026-10-21)
 
 ### 修复（续 1.13.3 小红书解析）

@@ -90,7 +90,9 @@ export class XhsResolver {
     return { message: '该笔记需要访问凭证（请先点下方按钮获取凭证再重试）', credential: true };
   }
 
-  /** GET 页面文本，手动跟随 3xx 重定向（最多 maxHops 跳），自动携带会话 Cookie */
+  /** GET 页面文本：与收藏 XhsHttpClient.fetchHtml 一致——UA 带 xiaohongshu 后缀 +
+   *  WebView 共享会话 Cookie（按 host 取）+ 依赖 http 默认自动跟随 3xx 重定向
+   *  + 不设 expectDataType（避免 gzip 响应在部分情况下被解析成空串，收藏即如此）。 */
   private static async fetchHtmlFollow(url: string, maxHops: number): Promise<string> {
     const resp: XhsResponse = await XhsResolver.fetchOnce(url);
     if (resp.isRedirect) {
@@ -101,7 +103,7 @@ export class XhsResolver {
       return XhsResolver.fetchHtmlFollow(next, maxHops - 1);
     }
     if (resp.text.length < 50) {
-      throw new Error('页面内容为空');
+      throw new Error('页面内容为空（可能触发了访问验证，请先获取访问凭证后重试）');
     }
     return resp.text;
   }
@@ -109,45 +111,39 @@ export class XhsResolver {
   private static fetchOnce(url: string): Promise<XhsResponse> {
     return new Promise<XhsResponse>((resolve: (v: XhsResponse) => void, reject: (e: Error) => void): void => {
       const req: http.HttpRequest = http.createHttp();
-      // 会话 Cookie（收藏 useWebSession 同款）：应用内 WebView 访问过小红书即自动携带
       const header: Record<string, string> = {
         'User-Agent': XhsResolver.UA,
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'zh-CN,zh;q=0.9'
       };
-      if (url.startsWith('https://')) {
-        try {
-          const cookie: string = webview.WebCookieManager.fetchCookieSync(url) ?? '';
-          if (cookie.length > 0) {
-            header['Cookie'] = cookie;
-          }
-        } catch (e) {
-          // 无会话则匿名访问
-        }
+      // 会话 Cookie：与收藏 XhsHttpClient.cookieHeaderFor 一致，按 host 取 WebView 共享 cookie 桶
+      const cookie: string = XhsResolver.cookieForUrl(url);
+      if (cookie.length > 0) {
+        header['Cookie'] = cookie;
       }
-      req.request(url, {
+      const options: http.HttpRequestOptions = {
         method: http.RequestMethod.GET,
-        connectTimeout: 10000,
-        readTimeout: 20000,
         header: header,
-        usingCache: false,
-        expectDataType: http.HttpDataType.STRING
-      }).then((resp: http.HttpResponse): void => {
+        connectTimeout: 15000,
+        readTimeout: 20000,
+        usingCache: false
+      };
+      req.request(url, options).then((resp: http.HttpResponse): void => {
         try {
           const code: number = resp.responseCode;
+          const text: string = typeof resp.result === 'string' ? resp.result as string : '';
           if (code >= 300 && code < 400) {
             const locRaw: Object | undefined = (resp.header as Record<string, Object>)['location'];
             const loc: string = locRaw !== undefined ? String(locRaw) : '';
             resolve(new XhsResponse(true, loc, ''));
             return;
           }
-          if (code < 200 || code >= 300) {
-            const cred: boolean = code === 401 || code === 403;
-            reject(new Error(`小红书返回 HTTP ${code}${cred ? '（需要访问凭证）' : (code === 404 ? '（链接可能已失效）' : '')}`));
+          if (code >= 200 && code < 400 && text.length > 0) {
+            resolve(new XhsResponse(false, '', text));
             return;
           }
-          const text: string = typeof resp.result === 'string' ? resp.result : '';
-          resolve(new XhsResponse(false, '', text));
+          const cred: boolean = code === 401 || code === 403;
+          reject(new Error(`小红书返回 HTTP ${code}${cred ? '（需要访问凭证）' : (code === 404 ? '（链接可能已失效）' : '')}`));
         } finally {
           req.destroy();
         }
@@ -156,6 +152,27 @@ export class XhsResolver {
         reject(new Error(err.message ?? '网络错误，请检查网络'));
       });
     });
+  }
+
+  /** 与收藏 XhsHttpClient.cookieHeaderFor 一致：仅对小红书/rednote 域注入会话 Cookie（按 host 取） */
+  private static cookieForUrl(url: string): string {
+    if (!url.startsWith('https://')) {
+      return '';
+    }
+    if (url.indexOf('xiaohongshu.com') >= 0 || url.indexOf('rednote.com') >= 0 || url.indexOf('xhslink.com') >= 0) {
+      const hosts: string[] = ['https://www.xiaohongshu.com', 'https://www.rednote.com'];
+      for (const h of hosts) {
+        try {
+          const c: string = webview.WebCookieManager.fetchCookieSync(h) ?? '';
+          if (c.length > 0) {
+            return c;
+          }
+        } catch (e) {
+          // 忽略，尝试下一个 host
+        }
+      }
+    }
+    return '';
   }
 
   /** 相对 Location 转绝对 URL */
